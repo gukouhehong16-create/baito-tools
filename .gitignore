@@ -1,0 +1,8 @@
+Thumbs.db
+desktop.ini
+ehthumbs.db
+.DS_Store
+*.tmp
+*.bak
+~$*
+.playwright-mcp/

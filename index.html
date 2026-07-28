@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>バイトの計算ツール｜給料と年収の壁を、入力するだけで</title>
+<meta name="description" content="学生アルバイト向けの計算ツールを集めた場所です。深夜手当・残業手当こみの給料計算と、扶養を外れないラインの判定。どちらも無料・登録不要・スマホ対応。">
+<meta property="og:title" content="バイトの計算ツール｜給料と年収の壁を、入力するだけで">
+<meta property="og:description" content="学生アルバイト向けの計算ツールを集めた場所です。給料計算と年収の壁の判定。">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://baito-tools.pages.dev/">
+<link rel="canonical" href="https://baito-tools.pages.dev/">
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#14161f;
+    --paper:#f2f4f7;
+    --card:#ffffff;
+    --line:#dfe3ea;
+    --muted:#6b7280;
+    --indigo:#3d4a7a;
+    --amber:#e8a33d;
+    --sans:"Zen Kaku Gothic New",system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;
+    --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0;background:var(--paper);color:var(--ink);
+    font-family:var(--sans);font-weight:400;line-height:1.7;
+    font-size:16px;
+  }
+  .wrap{max-width:680px;margin:0 auto;padding:0 18px 72px}
+
+  header{padding:40px 0 28px}
+  .eyebrow{
+    font-family:var(--mono);font-size:11px;font-weight:600;
+    letter-spacing:.16em;text-transform:uppercase;color:var(--indigo);
+    margin:0 0 12px;
+  }
+  h1{
+    font-size:clamp(28px,7vw,40px);font-weight:700;line-height:1.25;
+    letter-spacing:-.02em;margin:0 0 10px;
+  }
+  .lede{margin:0;color:var(--muted);font-size:15px}
+  .lede b{color:var(--ink);font-weight:500}
+
+  /* ---------- tool cards ---------- */
+  .tools{display:grid;gap:14px}
+  .tool{
+    display:block;text-decoration:none;color:inherit;
+    background:var(--card);border:1px solid var(--line);
+    border-radius:14px;padding:20px;
+    transition:border-color .15s, transform .15s;
+  }
+  .tool:hover{border-color:var(--indigo);transform:translateY(-1px)}
+  .tool:focus-visible{outline:2px solid var(--indigo);outline-offset:2px}
+  .tool .tag{
+    font-family:var(--mono);font-size:10.5px;font-weight:600;
+    letter-spacing:.12em;text-transform:uppercase;color:var(--indigo);
+    margin:0 0 8px;
+  }
+  .tool h2{font-size:19px;font-weight:700;letter-spacing:-.01em;margin:0 0 7px}
+  .tool p{font-size:13.5px;color:#3f4450;margin:0}
+  .tool .go{
+    display:inline-block;margin-top:12px;
+    font-family:var(--mono);font-size:12px;font-weight:600;color:var(--indigo);
+  }
+
+  .about{
+    background:var(--card);border:1px solid var(--line);
+    border-radius:14px;padding:20px;margin-top:16px;
+  }
+  .about h2{font-size:13px;font-weight:700;letter-spacing:.06em;margin:0 0 12px;color:var(--indigo)}
+  .about p{font-size:13.5px;color:#3f4450;margin:0 0 9px}
+  .about p:last-child{margin-bottom:0}
+  .about .num{font-family:var(--mono);font-weight:600;color:var(--ink)}
+
+  footer{text-align:center;font-size:12px;color:var(--muted);padding-top:26px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">Baito Tools</p>
+    <h1>バイトの計算ツール</h1>
+    <p class="lede">学生アルバイトのための計算ツールを集めた場所です。<b>給料がいくらになるか</b>と<b>いくらまで稼いでいいか</b>を、入力するだけで出します。どれも無料・登録不要で、入力したデータは端末の中だけに残ります。</p>
+  </header>
+
+  <div class="tools">
+
+    <a class="tool" href="/kyuryo/">
+      <p class="tag">給料を計算する</p>
+      <h2>バイト給料計算機</h2>
+      <p>シフトを入れるだけで、深夜手当・残業手当こみの支給額を計算します。深夜割増（22時〜5時）と1日8時間超の残業割増が重なる時間は1.5倍まで対応。月ごとの内訳も出ます。</p>
+      <span class="go">計算する →</span>
+    </a>
+
+    <a class="tool" href="/nenshu-kabe/">
+      <p class="tag">稼げる上限を知る</p>
+      <h2>年収の壁 判定ツール</h2>
+      <p>扶養を外れないラインと、今年あといくら働けるかが出ます。2025年の改正で基準額が動いたため、「103万円の壁」はすでに古い数字です。19〜22歳の学生は<span class="num">150万円</span>が実質の壁になります。</p>
+      <span class="go">判定する →</span>
+    </a>
+
+  </div>
+
+  <section class="about">
+    <h2>このサイトについて</h2>
+    <p>アルバイトの給料や扶養の話は、解説記事を読んでも「で、自分の場合はいくらなのか」がわからないまま終わりがちです。ここに置いてあるのは、読ませる記事ではなく<b>自分の数字を入れると答えが出る道具</b>です。</p>
+    <p>金額はすべて目安です。実際の支給額は雇用契約と就業規則に、扶養の判定は勤務先や親の健康保険組合の規約によります。判断に迷う場合は、それぞれの窓口に確認してください。</p>
+  </section>
+
+  <footer>入力したデータはこの端末のブラウザにのみ保存されます。サーバーには送信されません。</footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="google-site-verification" content="i21F9yP0Ib9K9oosgWtmhbeAzFIP-VBzGh0NO58XHo8" />
+<title>年収の壁 判定ツール｜学生バイトが今年あといくら稼げるか</title>
+<meta name="description" content="生年と今年の収入を入れるだけで、扶養を外れないラインと「あといくら働けるか」を出します。2025年改正後の150万円・123万円・160万円・188万円に対応。103万の壁はもう古い基準です。">
+<meta property="og:title" content="年収の壁 判定ツール｜学生バイトが今年あといくら稼げるか">
+<meta property="og:description" content="生年と今年の収入を入れるだけ。扶養を外れないラインと、あと働ける金額・時間が出ます。">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://baito-tools.pages.dev/nenshu-kabe/">
+<link rel="canonical" href="https://baito-tools.pages.dev/nenshu-kabe/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#14161f;
+    --paper:#f2f4f7;
+    --card:#ffffff;
+    --line:#dfe3ea;
+    --muted:#6b7280;
+    --indigo:#3d4a7a;
+    --amber:#e8a33d;
+    --rose:#c4566b;
+    --plum:#8e3b6b;
+    --green:#3f7d5c;
+    --break:#d5d9e0;
+    --sans:"Zen Kaku Gothic New",system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;
+    --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0;background:var(--paper);color:var(--ink);
+    font-family:var(--sans);font-weight:400;line-height:1.7;
+    font-size:16px;
+  }
+  .wrap{max-width:680px;margin:0 auto;padding:0 18px 72px}
+
+  /* ---------- header ---------- */
+  header{padding:40px 0 28px}
+  .eyebrow{
+    font-family:var(--mono);font-size:11px;font-weight:600;
+    letter-spacing:.16em;text-transform:uppercase;color:var(--indigo);
+    margin:0 0 12px;
+  }
+  h1{
+    font-size:clamp(28px,7vw,40px);font-weight:700;line-height:1.25;
+    letter-spacing:-.02em;margin:0 0 10px;
+  }
+  .lede{margin:0;color:var(--muted);font-size:15px}
+  .lede b{color:var(--ink);font-weight:500}
+
+  /* ---------- cards ---------- */
+  .card{
+    background:var(--card);border:1px solid var(--line);
+    border-radius:14px;padding:20px;margin-bottom:16px;
+  }
+  .card > h2{
+    font-size:13px;font-weight:700;letter-spacing:.06em;
+    margin:0 0 16px;color:var(--indigo);
+  }
+
+  /* ---------- form ---------- */
+  .grid{display:grid;gap:12px}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  @media(max-width:520px){
+    .g3{grid-template-columns:1fr 1fr}
+  }
+  .field{display:flex;flex-direction:column;gap:5px;min-width:0}
+  .field > span{font-size:12px;color:var(--muted);font-weight:500}
+  input,select{
+    font-family:var(--mono);font-size:16px;font-variant-numeric:tabular-nums;
+    color:var(--ink);background:#fbfcfd;
+    border:1px solid var(--line);border-radius:8px;
+    padding:10px 11px;width:100%;min-width:0;
+  }
+  select{font-family:var(--sans)}
+  input:focus-visible,select:focus-visible{outline:2px solid var(--indigo);outline-offset:1px;border-color:var(--indigo)}
+  .full{margin-top:12px}
+  .err{
+    color:var(--rose);font-size:13px;font-weight:500;
+    margin:10px 0 0;min-height:1px;
+  }
+
+  /* ---------- headline result ---------- */
+  .headline{
+    background:#fbfcfd;border:1px solid var(--line);border-radius:10px;
+    padding:20px 18px;text-align:center;
+  }
+  .headline .cap{font-size:13px;color:var(--muted);margin:0 0 6px}
+  .headline .big{
+    font-family:var(--mono);font-variant-numeric:tabular-nums;
+    font-size:clamp(30px,9vw,46px);font-weight:600;letter-spacing:-.02em;
+    line-height:1.15;margin:0;
+  }
+  .headline .big small{font-size:.42em;font-weight:400;color:var(--muted);margin-left:4px}
+  .headline .big.over{color:var(--rose)}
+  .headline .sub{font-size:13.5px;color:#3f4450;margin:10px 0 0}
+  .headline .sub b{font-family:var(--mono);font-weight:600}
+  .headline .sub a{color:var(--indigo)}
+
+  /* ---------- wall bar ---------- */
+  .wallbar{margin-top:22px}
+  .track{
+    position:relative;height:16px;border-radius:4px;
+    background:var(--break);overflow:hidden;
+  }
+  .track .fill{height:100%;background:var(--indigo);border-radius:4px 0 0 4px}
+  .track .fill.warn{background:var(--amber)}
+  .track .fill.over{background:var(--rose)}
+  .ticks{position:relative;height:52px;margin-top:5px}
+  .ticks span{
+    position:absolute;transform:translateX(-50%);
+    font-family:var(--mono);font-size:10.5px;color:var(--muted);
+    text-align:center;line-height:1.3;white-space:nowrap;
+  }
+  .ticks span i{display:block;font-style:normal;color:var(--ink);font-weight:600}
+  .ticks span.here i{color:var(--indigo)}
+
+  /* ---------- impact ---------- */
+  .impact{display:grid;gap:12px;grid-template-columns:1fr 1fr}
+  @media(max-width:560px){.impact{grid-template-columns:1fr}}
+  .box{border:1px solid var(--line);border-radius:10px;padding:14px 15px}
+  .box h3{font-size:12.5px;font-weight:700;margin:0 0 8px;color:var(--indigo)}
+  .box p{font-size:13px;color:#3f4450;margin:0 0 7px}
+  .box p:last-child{margin-bottom:0}
+  .box .num{font-family:var(--mono);font-weight:600;color:var(--ink)}
+
+  .flag{
+    border-left:3px solid var(--amber);padding:2px 0 2px 13px;
+    font-size:13px;color:#3f4450;margin:14px 0 0;
+  }
+  .flag.warn{border-left-color:var(--rose)}
+  .flag.ok{border-left-color:var(--green)}
+
+  /* ---------- table ---------- */
+  .tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+  .tbl th,.tbl td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left}
+  .tbl th{font-size:11.5px;color:var(--muted);font-weight:600}
+  .tbl td:first-child{font-family:var(--mono);white-space:nowrap}
+  .tbl tr.mark td{background:#fbfcfd;font-weight:500}
+  .scroll{overflow-x:auto}
+
+  /* ---------- notes ---------- */
+  .notes h2{font-size:15px;font-weight:700;color:var(--ink);margin:0 0 12px}
+  .notes h3{font-size:13.5px;font-weight:700;margin:20px 0 6px}
+  .notes p,.notes li{font-size:13.5px;color:#3f4450;margin:0 0 9px}
+  .notes ul{padding-left:1.2em;margin:0 0 9px}
+  .notes .num{font-family:var(--mono);font-weight:600;color:var(--ink)}
+  .notes a{color:var(--indigo)}
+  .caution{
+    border-left:3px solid var(--amber);padding:2px 0 2px 13px;
+    font-size:13px;color:#3f4450;margin:16px 0 0;
+  }
+  .src{font-size:12.5px;color:var(--muted);margin:0 0 6px}
+  .src a{color:var(--indigo)}
+  .asof{
+    font-family:var(--mono);font-size:11px;letter-spacing:.06em;
+    color:var(--muted);margin:0 0 14px;
+  }
+  footer{text-align:center;font-size:12px;color:var(--muted);padding-top:26px}
+  footer a{color:var(--indigo)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">2026 / 令和7年度改正 対応</p>
+    <h1>年収の壁 判定ツール</h1>
+    <p class="lede">生年と今年の収入を入れると、<b>扶養を外れないライン</b>と<b>あといくら働けるか</b>が出ます。「103万の壁」は<b>すでに古い基準</b>です。</p>
+  </header>
+
+  <section class="card">
+    <h2>あなたの状況</h2>
+    <div class="grid g3">
+      <label class="field"><span>生まれた年（西暦）</span><input id="birth" type="number" inputmode="numeric" value="2005" min="1900" max="2100" step="1"></label>
+      <label class="field"><span>今年すでに稼いだ額（円）</span><input id="earned" type="number" inputmode="numeric" value="600000" min="0" step="10000"></label>
+      <label class="field"><span>時給（円）</span><input id="wage" type="number" inputmode="numeric" value="1100" min="0" step="10"></label>
+    </div>
+    <label class="field full"><span>学生区分</span>
+      <select id="kubun">
+        <option value="day">昼間部の学生（全日制）</option>
+        <option value="night">夜間部・通信制・定時制</option>
+        <option value="leave">休学中</option>
+        <option value="none">学生ではない</option>
+      </select>
+    </label>
+    <p class="err" id="err" role="status" aria-live="polite"></p>
+  </section>
+
+  <section class="card">
+    <h2>判定</h2>
+    <div id="result"></div>
+  </section>
+
+  <section class="card">
+    <h2>超えたらどうなるか</h2>
+    <div class="impact">
+      <div class="box">
+        <h3>親への影響</h3>
+        <div id="impParent"></div>
+      </div>
+      <div class="box">
+        <h3>自分への影響</h3>
+        <div id="impSelf"></div>
+      </div>
+    </div>
+    <div id="impFlags"></div>
+  </section>
+
+  <section class="card notes">
+    <h2>壁の一覧</h2>
+    <p class="asof">最終確認日：2026年7月27日</p>
+    <p>19歳以上23歳未満・昼間部の学生・親の扶養に入っている場合の一覧です。</p>
+    <div class="scroll">
+      <table class="tbl">
+        <tr><th>年収</th><th>親の税負担</th><th>本人の税</th><th>親の健康保険</th></tr>
+        <tr><td>〜100万円</td><td>影響なし</td><td>なし</td><td>入れる</td></tr>
+        <tr><td>100万〜123万円</td><td>影響なし</td><td>住民税のみ</td><td>入れる</td></tr>
+        <tr><td>123万〜150万円</td><td>影響なし</td><td>住民税のみ</td><td>入れる</td></tr>
+        <tr class="mark"><td>150万円</td><td colspan="3">← ここが実質の壁</td></tr>
+        <tr><td>150万〜160万円</td><td>控除が減り始める</td><td>住民税のみ</td><td>外れる</td></tr>
+        <tr><td>160万〜188万円</td><td>控除がさらに減る</td><td>所得税も発生</td><td>外れる</td></tr>
+        <tr><td>188万円〜</td><td>控除ゼロ</td><td>所得税</td><td>外れる</td></tr>
+      </table>
+    </div>
+    <p class="src" style="margin-top:10px">住民税の非課税ラインは自治体により異なります。</p>
+
+    <h3>なぜ150万円が実質の壁なのか</h3>
+    <p>123万円を超えても、150万円までは親の控除額が<span class="num">63万円</span>のまま変わりません。しかし150万円を超えると、<b>親の控除が減り始めるのと同時に、健康保険の扶養からも外れます</b>。ダメージが二重になるのがここです。</p>
+
+    <h3>103万円の壁はどうなった</h3>
+    <p>2025年（令和7年度）の改正で、給与所得控除の最低保障額が55万円から<span class="num">65万円</span>に、基礎控除が48万円から<span class="num">95万円</span>に引き上げられました。扶養親族の所得要件も合計所得58万円以下となり、給与収入では<span class="num">123万円</span>に相当します。「103万円」という数字はこの改正前のもので、今は使いません。</p>
+  </section>
+
+  <section class="card notes">
+    <h2>よくある疑問</h2>
+
+    <h3>130万円と150万円、どっちが正しい？</h3>
+    <p>年齢で変わります。扶養認定日が令和7年10月1日以降で、<span class="num">19歳以上23歳未満</span>なら150万円未満。それ以外の年齢は従来どおり130万円未満です。12月31日時点の年齢で判定するので、今年23歳になる人は150万円が使えません。</p>
+
+    <h3>交通費は年収に含まれる？</h3>
+    <p><b>税と社会保険で扱いが違います。</b>通勤手当は月15万円まで所得税が非課税なので、税の壁（123万・150万・160万）を数えるときは<b>含めません</b>。一方、健康保険の被扶養者の判定では<b>含めます</b>。同じ「年収」でも中身が違う点に注意してください。このツールの入力欄には、交通費を除いた額を入れてください。</p>
+
+    <h3>社会保険の判定は「年間いくら」ではない？</h3>
+    <p>そのとおりです。税金は1月から12月までの確定額で判定しますが、健康保険の被扶養者は<b>これから先1年間の見込み</b>で判定します。実務では月額で見られることが多く、150万円なら月<span class="num">125,000円</span>、130万円なら月<span class="num">108,333円</span>が目安です。年の後半に一時的に増えただけでも指摘されることがあります。</p>
+
+    <h3>勤労学生控除は使える？</h3>
+    <p>制度としては残っていますが、<b>今回の改正で出番がほぼなくなりました</b>。給与所得控除65万円と基礎控除95万円だけで160万円まで所得税がかからない一方、勤労学生控除が使えるのは合計所得85万円以下（給与収入150万円以下）だからです。使える範囲では、そもそも所得税がかかりません。</p>
+
+    <h3>12月に働いた分はどっちの年に入る？</h3>
+    <p><b>給料が支払われた日</b>が基準です。12月に働いても支給が1月なら、翌年の収入として数えます。年末に調整したい場合は、勤務日ではなく給料日で考えてください。</p>
+
+    <h3>夜間部だと何が変わる？</h3>
+    <p>勤務先の社会保険（106万円の壁）の<b>適用除外が外れます</b>。昼間部の学生は短時間労働者の加入要件から除外されますが、夜間部・通信制・定時制・休学中は対象になります。この場合、106万円が先に来る壁になります。</p>
+
+    <p class="caution">ここに書いた内容は一般的な制度の説明です。実際の扱いは勤務先の規模や親の健康保険組合の規約によって変わります。判断に迷う場合は、勤務先・親の勤務先の健康保険組合・お住まいの税務署に確認してください。</p>
+  </section>
+
+  <section class="card notes">
+    <h2>出典</h2>
+    <p class="src">給与所得控除・基礎控除・扶養親族の所得要件 — <a href="https://www.nta.go.jp/users/gensen/2025kiso/index.htm" target="_blank" rel="noopener">国税庁「令和7年度税制改正による所得税の基礎控除の見直し等について」</a></p>
+    <p class="src">特定親族特別控除の控除額 — <a href="https://www.nta.go.jp/taxes/shiraberu/taxanswer/shotoku/1177.htm" target="_blank" rel="noopener">国税庁 タックスアンサー「No.1177 特定親族特別控除」</a></p>
+    <p class="src">健康保険の被扶養者の年間収入要件 — <a href="https://www.nenkin.go.jp/oshirase/taisetu/2025/202508/0819.html" target="_blank" rel="noopener">日本年金機構「19歳以上23歳未満の方の被扶養者認定における年間収入要件が変わります」</a></p>
+    <p class="src" style="margin-top:14px">給料そのものの計算は <a href="/kyuryo/">バイト給料計算機</a> をどうぞ。深夜手当・残業手当こみで次の支給額が出ます。</p>
+  </section>
+
+  <footer>
+    金額はすべて目安です。最終的な判断は勤務先・親の勤務先の健康保険組合・税務署に確認してください。<br>
+    入力したデータはこの端末のブラウザにのみ保存されます。サーバーには送信されません。
+  </footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var $ = function(id){ return document.getElementById(id); };
+  var STORE_KEY = "nenshuKabe.v1";
+  var FIELDS = ["birth","earned","wage","kubun"];
+  var THIS_YEAR = new Date().getFullYear();
+
+  // 給与収入ベースの基準額（2026年時点）
+  var W = {
+    juminzei:   1000000,  // 本人の住民税（おおむね。自治体差あり）
+    fuyou:      1230000,  // 税法上の扶養（合計所得58万円）
+    shaho106:   1060000,  // 勤務先の社会保険（学生は原則適用除外）
+    shaho130:   1300000,  // 親の健康保険（一般）
+    shaho150:   1500000,  // 親の健康保険（19歳以上23歳未満）
+    shotokuzei: 1600000,  // 本人の所得税（65万＋95万）
+    tokuteiEnd: 1880000   // 特定親族特別控除がゼロになる
+  };
+
+  // 特定親族特別控除：給与収入の上限 → 親の控除額
+  var TOKUTEI = [
+    [1500000, 630000],
+    [1550000, 610000],
+    [1600000, 510000],
+    [1650000, 410000],
+    [1700000, 310000],
+    [1750000, 210000],
+    [1800000, 110000],
+    [1850000,  60000],
+    [1880000,  30000]
+  ];
+
+  function yen(n){ return Math.round(n).toLocaleString("ja-JP"); }
+  function man(n){
+    var m = n / 10000;
+    return (Math.round(m * 10) / 10).toLocaleString("ja-JP") + "万";
+  }
+  function numOf(id, fallback){
+    var v = parseFloat($(id).value);
+    return isFinite(v) && v >= 0 ? v : fallback;
+  }
+
+  // 12月31日時点の年齢
+  function ageAtYearEnd(birthYear){ return THIS_YEAR - birthYear; }
+
+  function isTokutei(age){ return age >= 19 && age < 23; }
+
+  // 親が受けられる控除額
+  function parentDeduction(income, age){
+    if (age < 16) return 0;                       // 16歳未満は扶養控除の対象外
+    if (income <= W.fuyou) return isTokutei(age) ? 630000 : 380000;
+    if (!isTokutei(age)) return 0;                // 19〜22歳以外は123万円で一気にゼロ
+    for (var i = 0; i < TOKUTEI.length; i++){
+      if (income <= TOKUTEI[i][0]) return TOKUTEI[i][1];
+    }
+    return 0;
+  }
+
+  // 親の健康保険の被扶養者でいられる上限
+  function healthLimit(age){ return isTokutei(age) ? W.shaho150 : W.shaho130; }
+
+  // 実質的に最初にぶつかる壁
+  function mainWall(age, kubun){
+    if (kubun !== "day" && kubun !== "none") return W.shaho106; // 夜間・通信・定時制・休学中
+    if (isTokutei(age)) return W.shaho150;
+    return W.fuyou;
+  }
+
+  function wallLabel(wall, kubun){
+    if (wall === W.shaho106) return "106万円（勤務先の社会保険に加入するライン）";
+    if (wall === W.shaho150) return "150万円（親の控除が減り始め、健康保険の扶養も外れるライン）";
+    return "123万円（親の扶養から外れるライン）";
+  }
+
+  function render(){
+    var err = $("err");
+    var birth = Math.round(numOf("birth", 0));
+    var earned = numOf("earned", 0);
+    var wage = numOf("wage", 0);
+    var kubun = $("kubun").value;
+
+    if (!birth || birth < 1900 || birth > THIS_YEAR){
+      err.textContent = "生まれた年を西暦4桁で入れてください。";
+      $("result").innerHTML = "";
+      $("impParent").innerHTML = "";
+      $("impSelf").innerHTML = "";
+      $("impFlags").innerHTML = "";
+      return;
+    }
+    err.textContent = "";
+
+    var age = ageAtYearEnd(birth);
+    var wall = mainWall(age, kubun);
+    var left = wall - earned;
+    var over = left < 0;
+    var hours = wage > 0 ? Math.floor(Math.max(0, left) / wage) : null;
+
+    // ---- 見出しの結果 ----
+    var head =
+      '<div class="headline">' +
+        '<p class="cap">' + THIS_YEAR + '年12月31日時点で ' + age + '歳。あなたの壁は ' + man(wall) + '円です</p>' +
+        (over
+          ? '<p class="big over">' + man(-left) + '<small>円ぶん超えています</small></p>'
+          : '<p class="big">' + yen(left) + '<small>円</small></p>') +
+        (over
+          ? '<p class="sub">すでに壁を越えています。下の「超えたらどうなるか」を確認してください。</p>'
+          : '<p class="sub">今年はあと <b>' + yen(left) + '円</b> 働けます。' +
+            (hours !== null && wage > 0
+              ? '時給' + yen(wage) + '円なら <b>あと' + yen(hours) + '時間</b>。' +
+                '<a href="/kyuryo/">給料の計算はこちら</a>'
+              : '') +
+            '</p>') +
+      '</div>';
+
+    // ---- 壁バー ----
+    var MAX = 2000000;
+    var pct = Math.min(100, earned / MAX * 100);
+    var cls = over ? "over" : (earned > wall * 0.85 ? "warn" : "");
+    var marks = [
+      { v:W.fuyou,      t:"123万" },
+      { v:W.shaho150,   t:"150万" },
+      { v:W.shotokuzei, t:"160万" },
+      { v:W.tokuteiEnd, t:"188万" }
+    ];
+    // 150万と160万が近く重なるので、1つおきに段を下げる
+    var ticks = marks.map(function(m, i){
+      return '<span style="left:' + (m.v / MAX * 100).toFixed(2) + '%;top:' + (i % 2 ? 16 : 0) + 'px">' +
+             '<i>' + m.t + '</i></span>';
+    }).join("");
+    ticks += '<span class="here" style="left:' + pct.toFixed(2) + '%;top:34px">' +
+             '<i>現在地</i></span>';
+
+    var bar =
+      '<div class="wallbar">' +
+        '<div class="track"><div class="fill ' + cls + '" style="width:' + pct.toFixed(2) + '%"></div></div>' +
+        '<div class="ticks">' + ticks + '</div>' +
+      '</div>';
+
+    $("result").innerHTML = head + bar;
+
+    // ---- 超えたらどうなるか ----
+    var ded = parentDeduction(earned, age);
+    var dedFull = parentDeduction(0, age);
+    var hLimit = healthLimit(age);
+
+    var parentHtml = "";
+    if (age < 16){
+      parentHtml = '<p>16歳未満は扶養控除の対象外です。年収による親の税負担の変化はありません。</p>';
+    } else if (ded === dedFull){
+      parentHtml =
+        '<p>いまは親の控除が満額の <span class="num">' + yen(dedFull) + '円</span> です。</p>' +
+        (isTokutei(age)
+          ? '<p><span class="num">150万円</span>を超えると段階的に減り始め、<span class="num">188万円</span>でゼロになります。</p>'
+          : '<p><span class="num">123万円</span>を超えると<b>一気にゼロ</b>になります。19〜22歳のような段階的な緩和はありません。</p>');
+    } else if (ded > 0){
+      parentHtml =
+        '<p>親の控除は <span class="num">' + yen(ded) + '円</span> まで減っています（満額は' + yen(dedFull) + '円）。</p>' +
+        '<p>差額 <span class="num">' + yen(dedFull - ded) + '円</span> に親の税率をかけた分だけ、親の税負担が増えます。</p>';
+    } else {
+      parentHtml =
+        '<p>親の控除は <b>ゼロ</b>です。満額だった場合と比べ、<span class="num">' + yen(dedFull) + '円</span>ぶんの控除が失われています。</p>';
+    }
+
+    var selfHtml = "";
+    selfHtml += earned > W.juminzei
+      ? '<p>住民税：<b>かかります</b>（おおむね100万円超）。非課税限度額は自治体によって異なります。</p>'
+      : '<p>住民税：かかりません（おおむね100万円まで）。</p>';
+    selfHtml += earned > W.shotokuzei
+      ? '<p>所得税：<b>かかります</b>（160万円超）。</p>'
+      : '<p>所得税：かかりません（<span class="num">160万円</span>まで非課税）。</p>';
+    selfHtml += earned >= hLimit
+      ? '<p>親の健康保険：<b>外れます</b>（' + man(hLimit) + '円以上）。自分で国民健康保険などに入る必要があります。</p>'
+      : '<p>親の健康保険：入れます（' + man(hLimit) + '円未満）。</p>';
+
+    $("impParent").innerHTML = parentHtml;
+    $("impSelf").innerHTML = selfHtml;
+
+    // ---- 注意フラグ ----
+    var flags = "";
+    if (!isTokutei(age) && age >= 23){
+      flags += '<p class="flag warn"><b>' + THIS_YEAR + '年12月31日時点で' + age + '歳</b>のため、19〜22歳向けの特定親族特別控除と、健康保険の150万円は対象外です。壁は<b>123万円と130万円</b>に戻ります。誕生日による取りこぼしが最も多いポイントです。</p>';
+    }
+    if (age >= 16 && age < 19){
+      flags += '<p class="flag"><b>' + age + '歳</b>のため、特定扶養親族（19〜22歳）にはまだ該当しません。壁は<b>123万円と130万円</b>です。</p>';
+    }
+    if (kubun === "night" || kubun === "leave"){
+      flags += '<p class="flag warn">' +
+        (kubun === "leave" ? "休学中" : "夜間部・通信制・定時制") +
+        'は、勤務先の社会保険の<b>適用除外になりません</b>。勤務先の規模などの条件を満たすと、<b>106万円</b>で社会保険に加入することになります。</p>';
+    }
+    if (kubun === "none"){
+      flags += '<p class="flag">学生でない場合、勤務先の社会保険は<b>106万円</b>から対象になり得ます。</p>';
+    }
+    flags += '<p class="flag">学生かどうかに関わらず、<b>正社員の所定労働時間・日数の4分の3以上</b>働くと、勤務先の社会保険に加入します。シフトを大きく増やす場合は注意してください。</p>';
+    flags += '<p class="flag">健康保険の判定は「これから1年間の見込み」で行われます。月額でいうと' +
+             man(hLimit) + '円は月 <b>' + yen(Math.floor(hLimit / 12)) + '円</b> が目安です。</p>';
+
+    $("impFlags").innerHTML = flags;
+
+    save();
+  }
+
+  // ---------- 保存と復元 ----------
+  function save(){
+    try {
+      var data = {};
+      FIELDS.forEach(function(id){ data[id] = $(id).value; });
+      localStorage.setItem(STORE_KEY, JSON.stringify(data));
+    } catch(e){ /* 保存できなくても判定は動かす */ }
+  }
+
+  function load(){
+    var raw;
+    try { raw = localStorage.getItem(STORE_KEY); } catch(e){ return; }
+    if (!raw) return;
+
+    var data;
+    try { data = JSON.parse(raw); } catch(e){ return; }
+    if (!data || typeof data !== "object") return;
+
+    FIELDS.forEach(function(id){
+      var v = data[id];
+      if (v === null || v === undefined || v === "") return;
+      if (id === "kubun"){
+        var ok = ["day","night","leave","none"].indexOf(String(v)) >= 0;
+        if (ok) $(id).value = v;
+      } else if (isFinite(parseFloat(v))){
+        $(id).value = v;
+      }
+    });
+  }
+
+  FIELDS.forEach(function(id){
+    $(id).addEventListener("input", render);
+    $(id).addEventListener("change", render);
+  });
+
+  load();
+  render();
+
+})();
+</script>
+</body>
+</html>

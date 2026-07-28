@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="google-site-verification" content="i21F9yP0Ib9K9oosgWtmhbeAzFIP-VBzGh0NO58XHo8" />
+<title>バイト給料計算機｜深夜手当・残業手当こみで次の給料を出す</title>
+<meta name="description" content="シフトを入れるだけで、深夜割増（22時〜5時）と1日8時間超の残業割増をこみにした給料を計算します。深夜残業は1.5倍まで対応。無料・登録不要・スマホ対応。">
+<meta property="og:title" content="バイト給料計算機｜深夜手当・残業手当こみ">
+<meta property="og:description" content="シフトを入れるだけ。深夜割増と残業割増をこみにした給料の見込みが出ます。">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://baito-tools.pages.dev/kyuryo/">
+<link rel="canonical" href="https://baito-tools.pages.dev/kyuryo/">
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#14161f;
+    --paper:#f2f4f7;
+    --card:#ffffff;
+    --line:#dfe3ea;
+    --muted:#6b7280;
+    --indigo:#3d4a7a;
+    --amber:#e8a33d;
+    --rose:#c4566b;
+    --plum:#8e3b6b;
+    --break:#d5d9e0;
+    --sans:"Zen Kaku Gothic New",system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;
+    --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0;background:var(--paper);color:var(--ink);
+    font-family:var(--sans);font-weight:400;line-height:1.7;
+    font-size:16px;
+  }
+  .wrap{max-width:680px;margin:0 auto;padding:0 18px 72px}
+
+  /* ---------- header ---------- */
+  header{padding:40px 0 28px}
+  .eyebrow{
+    font-family:var(--mono);font-size:11px;font-weight:600;
+    letter-spacing:.16em;text-transform:uppercase;color:var(--indigo);
+    margin:0 0 12px;
+  }
+  h1{
+    font-size:clamp(28px,7vw,40px);font-weight:700;line-height:1.25;
+    letter-spacing:-.02em;margin:0 0 10px;
+  }
+  .lede{margin:0;color:var(--muted);font-size:15px}
+  .lede b{color:var(--ink);font-weight:500}
+
+  /* ---------- cards ---------- */
+  .card{
+    background:var(--card);border:1px solid var(--line);
+    border-radius:14px;padding:20px;margin-bottom:16px;
+  }
+  .card > h2{
+    font-size:13px;font-weight:700;letter-spacing:.06em;
+    margin:0 0 16px;color:var(--indigo);
+  }
+
+  /* ---------- form ---------- */
+  .grid{display:grid;gap:12px}
+  .g2{grid-template-columns:1fr 1fr}
+  .g4{grid-template-columns:repeat(4,1fr)}
+  @media(max-width:520px){
+    .g4{grid-template-columns:1fr 1fr}
+  }
+  .field{display:flex;flex-direction:column;gap:5px;min-width:0}
+  .field > span{font-size:12px;color:var(--muted);font-weight:500}
+  input{
+    font-family:var(--mono);font-size:16px;font-variant-numeric:tabular-nums;
+    color:var(--ink);background:#fbfcfd;
+    border:1px solid var(--line);border-radius:8px;
+    padding:10px 11px;width:100%;min-width:0;
+  }
+  input:focus-visible{outline:2px solid var(--indigo);outline-offset:1px;border-color:var(--indigo)}
+  button{
+    font-family:var(--sans);font-size:15px;font-weight:700;
+    color:#fff;background:var(--indigo);
+    border:0;border-radius:8px;padding:13px 18px;cursor:pointer;
+    width:100%;margin-top:14px;
+  }
+  button:hover{background:#2f3a63}
+  button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+  .err{
+    color:var(--rose);font-size:13px;font-weight:500;
+    margin:10px 0 0;min-height:1px;
+  }
+
+  /* ---------- shift rows ---------- */
+  .month-tag{
+    font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.1em;
+    color:var(--muted);padding:14px 0 8px;border-top:1px solid var(--line);
+    margin-top:8px;
+  }
+  .month-tag:first-child{border-top:0;margin-top:0;padding-top:0}
+  .shift{padding:14px 0;border-top:1px dashed var(--line)}
+  .shift:first-of-type{border-top:0}
+  .shift-top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .shift-date{font-family:var(--mono);font-size:14px;font-weight:600}
+  .shift-time{font-family:var(--mono);font-size:13px;color:var(--muted)}
+  .shift-pay{
+    margin-left:auto;font-family:var(--mono);font-size:16px;font-weight:600;
+    font-variant-numeric:tabular-nums;
+  }
+  .del{
+    background:none;border:0;color:var(--muted);font-size:12px;font-weight:500;
+    padding:2px 4px;width:auto;margin:0;cursor:pointer;text-decoration:underline;
+  }
+  .del:hover{color:var(--rose);background:none}
+  .clear-row{display:flex;justify-content:flex-end;margin-top:10px}
+  .clear-all{
+    background:none;border:0;color:var(--muted);font-size:12px;font-weight:500;
+    padding:2px 4px;width:auto;margin:0;cursor:pointer;text-decoration:underline;
+  }
+  .clear-all:hover{color:var(--rose);background:none}
+  .clear-all:focus-visible{outline:2px solid var(--indigo);outline-offset:2px}
+
+  /* ---------- signature: shift bar ---------- */
+  .bar{
+    display:flex;height:14px;border-radius:4px;overflow:hidden;
+    margin:9px 0 7px;background:var(--break);
+  }
+  .bar i{display:block;height:100%}
+  .bar i.grow{animation:grow .45s cubic-bezier(.2,.8,.2,1) both}
+  @keyframes grow{from{transform:scaleX(0);transform-origin:left}to{transform:scaleX(1)}}
+  @media(prefers-reduced-motion:reduce){.bar i.grow{animation:none}}
+  .s-normal{background:var(--indigo)}
+  .s-night{background:var(--amber)}
+  .s-ot{background:var(--rose)}
+  .s-otNight{background:var(--plum)}
+  .s-break{background:var(--break)}
+  .chips{display:flex;gap:12px;flex-wrap:wrap;font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+  .chips b{font-weight:600;color:var(--ink)}
+
+  .legend{
+    display:flex;gap:14px;flex-wrap:wrap;margin-top:18px;
+    padding-top:14px;border-top:1px solid var(--line);
+    font-size:11.5px;color:var(--muted);
+  }
+  .legend span{display:flex;align-items:center;gap:5px}
+  .legend i{width:11px;height:11px;border-radius:2px;display:block}
+
+  /* ---------- receipt ---------- */
+  .receipt{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .r-row{display:flex;gap:10px;font-size:13px;padding:5px 0}
+  .r-row .lbl{color:var(--muted)}
+  .r-row .qty{color:var(--muted);margin-left:auto}
+  .r-row .amt{min-width:78px;text-align:right;font-weight:500}
+  .r-total{
+    display:flex;align-items:baseline;gap:10px;
+    margin-top:12px;padding-top:14px;border-top:2px solid var(--ink);
+  }
+  .r-total .lbl{font-family:var(--sans);font-size:14px;font-weight:700}
+  .r-total .amt{margin-left:auto;font-size:30px;font-weight:600;letter-spacing:-.02em}
+  .r-total .amt small{font-size:15px;font-weight:400;color:var(--muted);margin-left:3px}
+  .grand{background:#fbfcfd;border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-top:16px}
+
+  .empty{color:var(--muted);font-size:14px;margin:0}
+
+  /* ---------- notes ---------- */
+  .notes h2{font-size:15px;font-weight:700;color:var(--ink);margin:0 0 12px}
+  .notes h3{font-size:13.5px;font-weight:700;margin:20px 0 6px}
+  .notes p,.notes li{font-size:13.5px;color:#3f4450;margin:0 0 9px}
+  .notes ul{padding-left:1.2em;margin:0 0 9px}
+  .notes .num{font-family:var(--mono);font-weight:600;color:var(--ink)}
+  .notes a{color:var(--indigo)}
+  .caution{
+    border-left:3px solid var(--amber);padding:2px 0 2px 13px;
+    font-size:13px;color:#3f4450;margin:16px 0 0;
+  }
+  footer{text-align:center;font-size:12px;color:var(--muted);padding-top:26px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">22:00 — 05:00</p>
+    <h1>バイト給料計算機</h1>
+    <p class="lede">シフトを入れると、<b>深夜割増</b>と<b>1日8時間超の残業割増</b>をこみにした給料が出ます。深夜かつ残業なら1.5倍まで計算します。登録不要。</p>
+  </header>
+
+  <section class="card">
+    <h2>条件</h2>
+    <div class="grid g4">
+      <label class="field"><span>時給（円）</span><input id="wage" type="number" inputmode="numeric" value="1100" min="0" step="10"></label>
+      <label class="field"><span>交通費（円/日）</span><input id="fare" type="number" inputmode="numeric" value="0" min="0" step="10"></label>
+      <label class="field"><span>深夜割増（%）</span><input id="nightPct" type="number" inputmode="numeric" value="25" min="0" step="5"></label>
+      <label class="field"><span>残業割増（%）</span><input id="otPct" type="number" inputmode="numeric" value="25" min="0" step="5"></label>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>シフトを追加</h2>
+    <div class="grid g4">
+      <label class="field"><span>日付</span><input id="date" type="date"></label>
+      <label class="field"><span>開始</span><input id="start" type="time" value="18:00"></label>
+      <label class="field"><span>終了</span><input id="end" type="time" value="23:00"></label>
+      <label class="field"><span>休憩（分）</span><input id="brk" type="number" inputmode="numeric" value="0" min="0" step="15"></label>
+    </div>
+    <button id="add">シフトを追加する</button>
+    <p class="err" id="err" role="status" aria-live="polite"></p>
+  </section>
+
+  <section class="card">
+    <h2>登録したシフト</h2>
+    <div id="list"><p class="empty">シフトを1件追加すると、時間の内訳と1日ぶんの金額がここに出ます。</p></div>
+    <div class="legend">
+      <span><i class="s-normal"></i>通常</span>
+      <span><i class="s-night"></i>深夜</span>
+      <span><i class="s-ot"></i>残業</span>
+      <span><i class="s-otNight"></i>深夜残業</span>
+      <span><i class="s-break"></i>休憩</span>
+    </div>
+    <div class="clear-row"><button type="button" class="clear-all" id="clearAll">保存したシフトを全部消す</button></div>
+  </section>
+
+  <section class="card">
+    <h2>集計</h2>
+    <div id="sum"><p class="empty">まだ計算するシフトがありません。</p></div>
+  </section>
+
+  <section class="card notes">
+    <h2>計算のしかた</h2>
+    <p>労働基準法では、深夜と時間外について次の割増が決められています。この計算機はどちらも、そして両方が重なった場合も計算します。</p>
+
+    <h3>深夜割増（22時〜翌5時）</h3>
+    <p>この時間帯に働いた分は<span class="num">25%以上</span>の割増になります。アルバイトでも雇用形態に関係なく適用されます。バイト先によっては25%より高い率を設定していることもあるので、上の「深夜割増」の数字は雇用契約書に合わせて変えてください。</p>
+
+    <h3>残業割増（1日8時間・週40時間を超えた分）</h3>
+    <p>割増がつくのは<span class="num">法定労働時間の8時間</span>を超えた分だけです。ここを勘違いしている人が多いのですが、<b>シフトが6時間の日に1時間延長して7時間になっても、割増はつきません</b>。8時間を超えると、そこから1分単位で25%以上の割増がつきます。</p>
+
+    <h3>深夜と残業が重なったとき</h3>
+    <p>割増は掛け算ではなく足し算です。25%＋25%で<span class="num">1.5倍</span>になります。時給1,000円で8時間30分働き、超過した30分が22時以降だった場合、(8時間×1,000円)＋(0.5時間×1,500円)＝<span class="num">8,750円</span>です。</p>
+
+    <p class="caution">休憩は勤務時間の中央にとったものとして計算しています。休憩が深夜帯にかかる場合、実際の金額と数十円ずれることがあります。また、週40時間超の判定と、月60時間を超える時間外（50%以上の割増）には対応していません。給与明細と合わない場合は、必ずバイト先に確認してください。</p>
+  </section>
+
+  <section class="card notes">
+    <h2>よくある疑問</h2>
+
+    <h3>休憩時間に給料は出る？</h3>
+    <p>原則として出ません。休憩時間は労働時間に含まれないため、給料の計算対象外です。10時から19時までの9時間拘束で休憩が1時間なら、支払われるのは8時間ぶんになります。この計算機も、入力された休憩を差し引いて計算しています。</p>
+    <p>ただし例外があります。「休憩」と呼ばれていても、レジや電話にすぐ対応できるよう待機させられている時間は<span class="num">手待ち時間</span>として労働時間に含まれます。自由に過ごせない時間は、法律上の休憩ではありません。</p>
+
+    <h3>休憩は何分もらえるはず？</h3>
+    <p>労働基準法第34条で決まっています。労働時間が<span class="num">6時間を超え8時間以下</span>なら45分以上、<span class="num">8時間を超える</span>なら1時間以上の休憩が必要です。</p>
+    <ul>
+      <li>6時間ちょうど → 休憩0分でも適法</li>
+      <li>6時間1分 → 45分以上が必要</li>
+      <li>8時間ちょうど → 45分以上でよい</li>
+      <li>8時間1分 → 1時間以上が必要</li>
+    </ul>
+    <p>1分でも超えると基準が変わるのがポイントです。また休憩は勤務の途中に与える必要があり、始業前や終業後にまとめる形は認められていません。</p>
+
+    <h3>18歳未満は深夜に働ける？</h3>
+    <p>働けません。労働基準法第61条で、18歳未満は<span class="num">22時から翌5時まで</span>の労働が原則禁止されています。深夜手当がつくかどうか以前に、その時間帯のシフトに入ること自体ができません。</p>
+    <p>18歳以上であれば、高校生でも法律上は深夜に働けます。ただし校則、自治体の青少年保護育成条例、バイト先の社内ルールで禁止されていることが多く、実際には難しいのが現状です。シフトに入る前に学校の規則を確認してください。</p>
+
+    <h3>深夜手当が出ていない気がする</h3>
+    <p>深夜割増は雇用形態に関係なく適用されます。「アルバイトだからつかない」ということはありません。</p>
+    <p>「時給に深夜分も含まれている」と説明されることもあります。基本の時給と深夜割増が明確に区分され、割増部分が法定の水準を満たしていれば問題ありませんが、区分がはっきりしないなら確認する価値があります。</p>
+    <p>まず給与明細と雇用契約書を見比べ、この計算機の結果と照らしてください。差があればバイト先に確認を。それでも解決しない場合は、各地の労働基準監督署に無料の相談窓口があります。</p>
+
+    <p class="caution">ここに書いた内容は一般的な法律の説明です。実際の扱いは雇用契約や就業規則によって変わることがあるため、個別の事情については労働基準監督署などの窓口に相談してください。</p>
+  </section>
+
+  <section class="card notes">
+    <h2>関連ツール</h2>
+    <p><a href="/nenshu-kabe/">年収の壁 判定ツール</a> — 扶養を外れないラインと「今年あといくら稼げるか」が出ます。2025年の改正で基準額が動いたため、<b>「103万円の壁」はすでに古い数字</b>です。学生でバイト先を掛け持ちしている人ほど、一度確認しておくと安心です。</p>
+  </section>
+
+  <footer>金額はすべて目安です。実際の支給額は雇用契約と就業規則によります。<br>入力したデータはこの端末のブラウザにのみ保存されます。サーバーには送信されません。</footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var shifts = [];
+  var seq = 0;
+  var lastAdded = null;
+
+  var $ = function(id){ return document.getElementById(id); };
+  var NIGHT_FROM = 22*60, NIGHT_TO = 5*60, LEGAL_DAY = 480;
+
+  var KINDS = [
+    { key:"normal",  label:"通常"     },
+    { key:"night",   label:"深夜"     },
+    { key:"ot",      label:"残業"     },
+    { key:"otNight", label:"深夜残業" }
+  ];
+
+  function toMin(hhmm){
+    var p = String(hhmm).split(":");
+    return (parseInt(p[0],10)||0)*60 + (parseInt(p[1],10)||0);
+  }
+  function num(id, fallback){
+    var v = parseFloat($(id).value);
+    return isFinite(v) && v >= 0 ? v : fallback;
+  }
+  function yen(n){ return n.toLocaleString("ja-JP"); }
+  function hrs(min){ return (min/60).toFixed(2).replace(/\.00$/,""); }
+
+  // ---------- 保存と復元（この端末の localStorage のみ） ----------
+  var STORE_KEY = "baitoPay.v1";
+  var CFG_IDS = ["wage","fare","nightPct","otPct"];
+
+  // localStorage が無効（プライベートモード・容量超過など）でも計算機は動かす
+  function save(){
+    try {
+      var cfg = {};
+      CFG_IDS.forEach(function(id){ cfg[id] = $(id).value; });
+      localStorage.setItem(STORE_KEY, JSON.stringify({ shifts:shifts, cfg:cfg }));
+    } catch(e){ /* 保存できなくても計算は継続する */ }
+  }
+
+  function load(){
+    var raw;
+    try { raw = localStorage.getItem(STORE_KEY); } catch(e){ return; }
+    if (!raw) return;
+
+    var data;
+    try { data = JSON.parse(raw); } catch(e){ return; }
+    if (!data || typeof data !== "object") return;
+
+    if (data.cfg && typeof data.cfg === "object"){
+      CFG_IDS.forEach(function(id){
+        var v = data.cfg[id];
+        if (v === null || v === undefined || v === "") return;
+        if (isFinite(parseFloat(v))) $(id).value = v;
+      });
+    }
+
+    if (!Array.isArray(data.shifts)) return;
+
+    var restored = [], used = {}, max = 0;
+    data.shifts.forEach(function(s){
+      if (!s || typeof s !== "object") return;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(s.date)) return;
+      if (!/^\d{1,2}:\d{2}$/.test(s.start) || !/^\d{1,2}:\d{2}$/.test(s.end)) return;
+
+      // ID が欠損・不正・重複していたら振り直す（削除で別の行が消えるのを防ぐ）
+      var id = parseInt(s.id, 10);
+      if (!isFinite(id) || id <= 0 || used[id]) id = max + 1;
+      used[id] = true;
+      if (id > max) max = id;
+
+      var brk = parseFloat(s.brk);
+      if (!isFinite(brk) || brk < 0) brk = 0;
+
+      restored.push({ id:id, date:s.date, start:s.start, end:s.end, brk:brk });
+    });
+
+    shifts = restored;
+    seq = max; // 次の ++seq が既存 ID と衝突しないようにする
+  }
+
+  function config(){
+    var wage = num("wage", 0);
+    var nP = num("nightPct", 25) / 100;
+    var oP = num("otPct", 25) / 100;
+    return {
+      wage: wage,
+      fare: num("fare", 0),
+      rate: {
+        normal:  wage,
+        night:   wage * (1 + nP),
+        ot:      wage * (1 + oP),
+        otNight: wage * (1 + oP + nP)
+      }
+    };
+  }
+
+  // 1分ずつたどって、各分を「通常 / 深夜 / 残業 / 深夜残業 / 休憩」に振り分ける
+  function analyse(shift){
+    var s = toMin(shift.start), e = toMin(shift.end);
+    if (e <= s) e += 1440;
+    var span = e - s;
+    var brk  = Math.min(shift.brk, span);
+    var bFrom = Math.floor((span - brk) / 2);
+    var bTo   = bFrom + brk;
+
+    var mins = { normal:0, night:0, ot:0, otNight:0, brk:brk };
+    var segs = [];
+    var worked = 0;
+
+    for (var i = 0; i < span; i++){
+      var kind;
+      if (i >= bFrom && i < bTo){
+        kind = "break";
+      } else {
+        var clock = (s + i) % 1440;
+        var isNight = clock >= NIGHT_FROM || clock < NIGHT_TO;
+        worked++;
+        var isOt = worked > LEGAL_DAY;
+        kind = isOt ? (isNight ? "otNight" : "ot") : (isNight ? "night" : "normal");
+        mins[kind]++;
+      }
+      var tail = segs[segs.length - 1];
+      if (tail && tail.kind === kind) tail.len++;
+      else segs.push({ kind:kind, len:1 });
+    }
+
+    return { mins:mins, segs:segs, span:span, worked:worked };
+  }
+
+  function payOf(mins, cfg){
+    var total = 0, lines = [];
+    KINDS.forEach(function(k){
+      var m = mins[k.key];
+      if (!m) return;
+      var amt = Math.round(m / 60 * cfg.rate[k.key]);
+      total += amt;
+      lines.push({ label:k.label, min:m, rate:cfg.rate[k.key], amt:amt });
+    });
+    return { total:total, lines:lines };
+  }
+
+  function fmtDate(iso){
+    var d = new Date(iso + "T00:00:00");
+    var w = ["日","月","火","水","木","金","土"][d.getDay()];
+    return (d.getMonth()+1) + "/" + d.getDate() + "（" + w + "）";
+  }
+
+  function render(){
+    var cfg = config();
+    var list = $("list"), sum = $("sum");
+
+    if (!shifts.length){
+      list.innerHTML = '<p class="empty">シフトを1件追加すると、時間の内訳と1日ぶんの金額がここに出ます。</p>';
+      sum.innerHTML  = '<p class="empty">まだ計算するシフトがありません。</p>';
+      return;
+    }
+
+    shifts.sort(function(a,b){
+      return a.date === b.date ? toMin(a.start) - toMin(b.start) : (a.date < b.date ? -1 : 1);
+    });
+
+    var months = {}, order = [];
+    var listHtml = "", currentMonth = "";
+
+    shifts.forEach(function(sh){
+      var a = analyse(sh);
+      var p = payOf(a.mins, cfg);
+      var pay = p.total + cfg.fare;
+      var ym = sh.date.slice(0,7);
+
+      if (!months[ym]){
+        months[ym] = { mins:{normal:0,night:0,ot:0,otNight:0}, days:0, pay:0 };
+        order.push(ym);
+      }
+      KINDS.forEach(function(k){ months[ym].mins[k.key] += a.mins[k.key]; });
+      months[ym].days++;
+      months[ym].pay += pay;
+
+      if (ym !== currentMonth){
+        currentMonth = ym;
+        listHtml += '<p class="month-tag">' + ym.replace("-","年") + "月" + '</p>';
+      }
+
+      var bar = a.segs.map(function(sg){
+        var w = (sg.len / a.span * 100).toFixed(3);
+        var cls = "s-" + sg.kind + (sh.id === lastAdded ? " grow" : "");
+        return '<i class="' + cls + '" style="width:' + w + '%"></i>';
+      }).join("");
+
+      var chips = KINDS.filter(function(k){ return a.mins[k.key] > 0; })
+        .map(function(k){ return k.label + ' <b>' + hrs(a.mins[k.key]) + 'h</b>'; });
+      if (a.mins.brk) chips.push('休憩 <b>' + a.mins.brk + '分</b>');
+
+      listHtml +=
+        '<div class="shift">' +
+          '<div class="shift-top">' +
+            '<span class="shift-date">' + fmtDate(sh.date) + '</span>' +
+            '<span class="shift-time">' + sh.start + '–' + sh.end + '</span>' +
+            '<span class="shift-pay">¥' + yen(pay) + '</span>' +
+          '</div>' +
+          '<div class="bar" role="img" aria-label="勤務内訳">' + bar + '</div>' +
+          '<div class="chips">' + chips.join("") +
+            '<button class="del" data-id="' + sh.id + '">削除</button>' +
+          '</div>' +
+        '</div>';
+    });
+
+    list.innerHTML = listHtml;
+    Array.prototype.forEach.call(list.querySelectorAll(".del"), function(b){
+      b.addEventListener("click", function(){
+        var id = parseInt(b.getAttribute("data-id"), 10);
+        shifts = shifts.filter(function(s){ return s.id !== id; });
+        lastAdded = null;
+        save();
+        render();
+      });
+    });
+
+    var sumHtml = "", grand = 0;
+    order.forEach(function(ym){
+      var m = months[ym];
+      var p = payOf(m.mins, cfg);
+      var fare = cfg.fare * m.days;
+      var total = p.total + fare;
+      grand += total;
+
+      var rows = p.lines.map(function(l){
+        return '<div class="r-row"><span class="lbl">' + l.label + '</span>' +
+               '<span class="qty">' + hrs(l.min) + 'h × ' + yen(Math.round(l.rate)) + '</span>' +
+               '<span class="amt">' + yen(l.amt) + '</span></div>';
+      }).join("");
+      if (fare > 0){
+        rows += '<div class="r-row"><span class="lbl">交通費</span>' +
+                '<span class="qty">' + m.days + '日ぶん</span>' +
+                '<span class="amt">' + yen(fare) + '</span></div>';
+      }
+
+      sumHtml +=
+        '<div class="receipt" style="margin-bottom:22px">' +
+          '<p class="month-tag" style="padding-top:0;border-top:0;margin:0 0 6px">' +
+            ym.replace("-","年") + '月 ・ ' + m.days + '日勤務</p>' +
+          rows +
+          '<div class="r-total"><span class="lbl">支給見込み</span>' +
+          '<span class="amt">' + yen(total) + '<small>円</small></span></div>' +
+        '</div>';
+    });
+
+    if (order.length > 1){
+      sumHtml += '<div class="grand receipt"><div class="r-total" style="margin:0;padding:0;border:0">' +
+                 '<span class="lbl">全期間の合計</span>' +
+                 '<span class="amt">' + yen(grand) + '<small>円</small></span></div></div>';
+    }
+
+    sum.innerHTML = sumHtml;
+  }
+
+  $("add").addEventListener("click", function(){
+    var err = $("err");
+    var date = $("date").value;
+    var start = $("start").value;
+    var end = $("end").value;
+
+    if (!date){ err.textContent = "日付を入れてください。"; $("date").focus(); return; }
+    if (!start || !end){ err.textContent = "開始と終了の時刻を入れてください。"; return; }
+    if (start === end){ err.textContent = "開始と終了が同じ時刻です。"; return; }
+
+    var s = toMin(start), e = toMin(end);
+    if (e <= s) e += 1440;
+    var brk = Math.max(0, num("brk", 0));
+    if (brk >= e - s){ err.textContent = "休憩が勤務時間以上になっています。"; return; }
+
+    err.textContent = "";
+    lastAdded = ++seq;
+    shifts.push({ id:lastAdded, date:date, start:start, end:end, brk:brk });
+    save();
+    render();
+  });
+
+  CFG_IDS.forEach(function(id){
+    $(id).addEventListener("input", function(){ lastAdded = null; save(); render(); });
+  });
+
+  $("clearAll").addEventListener("click", function(){
+    if (!window.confirm("保存したシフトをすべて消します。よろしいですか？")) return;
+    shifts = [];
+    seq = 0;
+    lastAdded = null;
+    save(); // 設定（時給など）は残したまま、シフトだけ空にして保存し直す
+    render();
+  });
+
+  // 初期値は今日
+  var t = new Date();
+  $("date").value = t.getFullYear() + "-" +
+    String(t.getMonth()+1).padStart(2,"0") + "-" +
+    String(t.getDate()).padStart(2,"0");
+
+  load();
+  render();
+
+})();
+</script>
+</body>
+</html>
