@@ -2,7 +2,7 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://baito-tools.pages.dev/</loc>
-    <lastmod>2026-07-28</lastmod>
+    <lastmod>2026-07-29</lastmod>
     <changefreq>monthly</changefreq>
   </url>
   <url>
@@ -11,8 +11,23 @@
     <changefreq>monthly</changefreq>
   </url>
   <url>
+    <loc>https://baito-tools.pages.dev/roudou-jikan/</loc>
+    <lastmod>2026-07-29</lastmod>
+    <changefreq>monthly</changefreq>
+  </url>
+  <url>
+    <loc>https://baito-tools.pages.dev/kanpu/</loc>
+    <lastmod>2026-07-29</lastmod>
+    <changefreq>monthly</changefreq>
+  </url>
+  <url>
     <loc>https://baito-tools.pages.dev/nenshu-kabe/</loc>
     <lastmod>2026-07-28</lastmod>
+    <changefreq>monthly</changefreq>
+  </url>
+  <url>
+    <loc>https://baito-tools.pages.dev/yukyu/</loc>
+    <lastmod>2026-07-29</lastmod>
     <changefreq>monthly</changefreq>
   </url>
 </urlset>

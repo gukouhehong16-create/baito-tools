@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="google-site-verification" content="i21F9yP0Ib9K9oosgWtmhbeAzFIP-VBzGh0NO58XHo8" />
+<title>有給休暇 日数計算機｜バイト・パートが何日もらえるか</title>
+<meta name="description" content="働き始めた時期と週の勤務日数を入れるだけで、もらえる年次有給休暇の日数がわかります。週1日勤務でも有給はもらえます。比例付与にも対応。無料・登録不要。">
+<meta property="og:title" content="有給休暇 日数計算機｜バイト・パートが何日もらえるか">
+<meta property="og:description" content="週の勤務日数と勤続期間を入れるだけ。バイト・パートがもらえる有給の日数が出ます。">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://baito-tools.pages.dev/yukyu/">
+<link rel="canonical" href="https://baito-tools.pages.dev/yukyu/">
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#14161f;
+    --paper:#f2f4f7;
+    --card:#ffffff;
+    --line:#dfe3ea;
+    --muted:#6b7280;
+    --indigo:#3d4a7a;
+    --amber:#e8a33d;
+    --rose:#c4566b;
+    --plum:#8e3b6b;
+    --green:#3f7d5c;
+    --break:#d5d9e0;
+    --sans:"Zen Kaku Gothic New",system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;
+    --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0;background:var(--paper);color:var(--ink);
+    font-family:var(--sans);font-weight:400;line-height:1.7;
+    font-size:16px;
+  }
+  .wrap{max-width:680px;margin:0 auto;padding:0 18px 72px}
+
+  header{padding:40px 0 28px}
+  .eyebrow{
+    font-family:var(--mono);font-size:11px;font-weight:600;
+    letter-spacing:.16em;text-transform:uppercase;color:var(--indigo);
+    margin:0 0 12px;
+  }
+  h1{
+    font-size:clamp(28px,7vw,40px);font-weight:700;line-height:1.25;
+    letter-spacing:-.02em;margin:0 0 10px;
+  }
+  .lede{margin:0;color:var(--muted);font-size:15px}
+  .lede b{color:var(--ink);font-weight:500}
+
+  .card{
+    background:var(--card);border:1px solid var(--line);
+    border-radius:14px;padding:20px;margin-bottom:16px;
+  }
+  .card > h2{
+    font-size:13px;font-weight:700;letter-spacing:.06em;
+    margin:0 0 16px;color:var(--indigo);
+  }
+
+  .grid{display:grid;gap:12px}
+  .g2{grid-template-columns:1fr 1fr}
+  @media(max-width:520px){.g2{grid-template-columns:1fr}}
+  .field{display:flex;flex-direction:column;gap:5px;min-width:0}
+  .field > span{font-size:12px;color:var(--muted);font-weight:500}
+  input,select{
+    font-family:var(--mono);font-size:16px;font-variant-numeric:tabular-nums;
+    color:var(--ink);background:#fbfcfd;
+    border:1px solid var(--line);border-radius:8px;
+    padding:10px 11px;width:100%;min-width:0;
+  }
+  select{font-family:var(--sans)}
+  input:focus-visible,select:focus-visible{outline:2px solid var(--indigo);outline-offset:1px;border-color:var(--indigo)}
+  .full{margin-top:12px}
+  .inline{display:flex;gap:10px}
+  .inline > label{flex:1}
+  .err{color:var(--rose);font-size:13px;font-weight:500;margin:10px 0 0;min-height:1px}
+
+  .headline{
+    background:#fbfcfd;border:1px solid var(--line);border-radius:10px;
+    padding:20px 18px;text-align:center;
+  }
+  .headline .cap{font-size:13px;color:var(--muted);margin:0 0 6px}
+  .headline .big{
+    font-family:var(--mono);font-variant-numeric:tabular-nums;
+    font-size:clamp(30px,9vw,46px);font-weight:600;letter-spacing:-.02em;
+    line-height:1.15;margin:0;
+  }
+  .headline .big small{font-size:.42em;font-weight:400;color:var(--muted);margin-left:4px}
+  .headline .big.none{color:var(--muted);font-size:clamp(20px,5vw,26px)}
+  .headline .sub{font-size:13.5px;color:#3f4450;margin:10px 0 0}
+  .headline .sub b{font-family:var(--mono);font-weight:600}
+
+  .chart{margin-top:22px}
+  .row{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+  .row .lbl{
+    font-family:var(--mono);font-size:11px;color:var(--muted);
+    width:96px;flex:none;text-align:right;
+  }
+  .row .track{flex:1;height:14px;background:var(--break);border-radius:4px;overflow:hidden}
+  .row .fill{height:100%;background:var(--indigo);border-radius:4px}
+  .row.now .fill{background:var(--amber)}
+  .row.now .lbl{color:var(--ink);font-weight:600}
+  .row .val{
+    font-family:var(--mono);font-size:12px;font-variant-numeric:tabular-nums;
+    width:38px;flex:none;text-align:right;
+  }
+
+  .flag{
+    border-left:3px solid var(--amber);padding:2px 0 2px 13px;
+    font-size:13px;color:#3f4450;margin:14px 0 0;
+  }
+  .flag.ok{border-left-color:var(--green)}
+
+  .notes h2{font-size:15px;font-weight:700;color:var(--ink);margin:0 0 12px}
+  .notes h3{font-size:13.5px;font-weight:700;margin:20px 0 6px}
+  .notes p,.notes li{font-size:13.5px;color:#3f4450;margin:0 0 9px}
+  .notes ul{padding-left:1.2em;margin:0 0 9px}
+  .notes .num{font-family:var(--mono);font-weight:600;color:var(--ink)}
+  .notes a{color:var(--indigo)}
+  .caution{
+    border-left:3px solid var(--amber);padding:2px 0 2px 13px;
+    font-size:13px;color:#3f4450;margin:16px 0 0;
+  }
+  .src{font-size:12.5px;color:var(--muted);margin:0 0 6px}
+  .src a{color:var(--indigo)}
+  footer{text-align:center;font-size:12px;color:var(--muted);padding-top:26px}
+  footer a{color:var(--indigo)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">労働基準法 第39条</p>
+    <h1>有給休暇 日数計算機</h1>
+    <p class="lede">アルバイトにも<b>有給休暇はあります</b>。週1日の勤務でも対象です。働き始めた時期と週の勤務日数を入れると、いま何日もらえるかが出ます。</p>
+  </header>
+
+  <section class="card">
+    <h2>あなたの働き方</h2>
+    <label class="field"><span>働き始めた年月</span>
+      <span class="inline">
+        <label class="field"><select id="startYear"></select></label>
+        <label class="field"><select id="startMonth"></select></label>
+      </span>
+    </label>
+    <div class="grid g2 full">
+      <label class="field"><span>週の所定労働日数</span>
+        <select id="days">
+          <option value="1">週1日</option>
+          <option value="2">週2日</option>
+          <option value="3" selected>週3日</option>
+          <option value="4">週4日</option>
+          <option value="5">週5日以上</option>
+          <option value="shift">シフト制で決まっていない</option>
+        </select>
+      </label>
+      <label class="field"><span>週の所定労働時間</span>
+        <select id="hours">
+          <option value="under">30時間未満</option>
+          <option value="over">30時間以上</option>
+        </select>
+      </label>
+    </div>
+    <label class="field full" id="yearDaysWrap" style="display:none"><span>1年間の所定労働日数（日）</span>
+      <input id="yearDays" type="number" inputmode="numeric" value="100" min="0" max="366" step="1">
+    </label>
+    <p class="err" id="err" role="status" aria-live="polite"></p>
+  </section>
+
+  <section class="card">
+    <h2>もらえる日数</h2>
+    <div id="result"></div>
+  </section>
+
+  <section class="card notes">
+    <h2>知っておくこと</h2>
+    <p>付与には<b>「全労働日の8割以上の出勤」</b>という条件があります。このツールは8割を満たしている前提で計算しています。欠勤が多い場合は付与されないことがあります。</p>
+    <p>有給の時効は<span class="num">2年</span>です。使わないまま2年経つと消えます。繰り越せるのは前年分までと考えてください。</p>
+    <p>年<span class="num">10日以上</span>付与される人については、<b>年5日を必ず取らせることが会社の義務</b>になっています（労働基準法39条7項）。「忙しいから取らせない」は通りません。</p>
+    <p>有給を取る理由を会社に言う義務は<b>ありません</b>。「私用のため」で足ります。</p>
+    <p>パートから正社員になっても、<b>勤続年数は通算されます</b>。雇用形態が変わってもリセットされません。</p>
+  </section>
+
+  <section class="card notes">
+    <h2>よくある疑問</h2>
+
+    <h3>バイトでも有給はもらえる？</h3>
+    <p>もらえます。労働基準法39条に<b>アルバイト・パートを除外する規定はありません</b>。条件は<span class="num">6か月の継続勤務</span>と<span class="num">全労働日の8割以上の出勤</span>の2つだけです。週1日しか働いていなくても対象になります。</p>
+
+    <h3>有給を取ると時給はいくら計算になる？</h3>
+    <p>3つの方法があります（通常の賃金／平均賃金／標準報酬日額）。どれを使うかは<b>就業規則で決まっています</b>。シフト制の場合は「その日に働く予定だった時間 × 時給」が一般的です。8時間のシフトを有給にすれば8時間ぶん、4時間なら4時間ぶんが支払われます。</p>
+
+    <h3>辞めるときに残った有給は使える？</h3>
+    <p>使えます。退職日までの間に消化できます。買い取りは原則できませんが、<b>退職時の未消化分は例外的に買い取りが可能</b>です。ただし会社の義務ではないので、応じてもらえるとは限りません。取れるなら消化するのが確実です。</p>
+
+    <h3>「うちは有給ない」と言われたら？</h3>
+    <p>法律上の権利なので、<b>就業規則や口頭の説明で否定できません</b>。「そういう決まりだから」は通りません。話が進まない場合は、労働基準監督署に相談できます。</p>
+
+    <p class="caution">ここに書いた内容は一般的な制度の説明です。実際の付与日数は就業規則で法定を上回る定めがある場合もあります。個別の事情については、勤務先または労働基準監督署に確認してください。</p>
+  </section>
+
+  <section class="card notes">
+    <h2>出典</h2>
+    <p class="src">年次有給休暇の付与日数 — <a href="">労働基準法 第39条</a></p>
+    <p class="src">比例付与の日数表 — <a href="">労働基準法施行規則 第24条の3</a></p>
+    <p class="src" style="margin-top:14px">有給を取った日の給料は <a href="/kyuryo/">バイト給料計算機</a> で計算できます。「その日に働く予定だった時間 × 時給」で支払われるのが一般的なので、シフトの時間を入れればそのまま金額が出ます。</p>
+  </section>
+
+  <footer>
+    日数は目安です。就業規則で法定を上回る定めがある場合はそちらが優先されます。<br>
+    入力したデータはこの端末のブラウザにのみ保存されます。サーバーには送信されません。
+  </footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var $ = function(id){ return document.getElementById(id); };
+  var STORE_KEY = "yukyu.v1";
+  var FIELDS = ["startYear","startMonth","days","hours","yearDays"];
+  var TODAY = new Date();
+
+  // 労働基準法39条・施行規則24条の3の日数表
+  var NORMAL = [10,11,12,14,16,18,20];          // 通常付与（週5日以上 または 週30時間以上）
+  var PRO = {
+    4: [7,8,9,10,12,13,15],                     // 週4日（年169〜216日）
+    3: [5,6,6,8,9,10,11],                       // 週3日（年121〜168日）
+    2: [3,4,4,5,6,6,7],                         // 週2日（年73〜120日）
+    1: [1,2,2,2,3,3,3]                          // 週1日（年48〜72日）
+  };
+  // 区分の下限（か月）
+  var TIERS = [6,18,30,42,54,66,78];
+
+  function initSelects(){
+    var ys = $("startYear"), ms = $("startMonth");
+    var now = TODAY.getFullYear();
+    for (var y = 2015; y <= now; y++){
+      ys.insertAdjacentHTML("beforeend", '<option value="'+y+'">'+y+'年</option>');
+    }
+    for (var m = 1; m <= 12; m++){
+      ms.insertAdjacentHTML("beforeend", '<option value="'+m+'">'+m+'月</option>');
+    }
+    // 既定は1年前の同月
+    ys.value = String(now - 1);
+    ms.value = String(TODAY.getMonth() + 1);
+  }
+
+  // 開始年月から今日までの経過月数（開始月の1日起点）
+  function monthsElapsed(y, m){
+    return (TODAY.getFullYear() - y) * 12 + (TODAY.getMonth() + 1 - m);
+  }
+
+  function tierOf(months){
+    for (var i = TIERS.length - 1; i >= 0; i--){
+      if (months >= TIERS[i]) return i + 1;   // 1〜7
+    }
+    return 0;
+  }
+
+  // 年間所定労働日数 → 週あたりの区分
+  function weekFromYearDays(d){
+    if (d >= 217) return "normal";
+    if (d >= 169) return 4;
+    if (d >= 121) return 3;
+    if (d >= 73)  return 2;
+    if (d >= 48)  return 1;
+    return "none";
+  }
+
+  function ymAfter(y, m, addMonths){
+    var t = (y * 12 + (m - 1)) + addMonths;
+    return { y: Math.floor(t / 12), m: (t % 12) + 1 };
+  }
+
+  function render(){
+    var err = $("err"), out = $("result");
+    var y = parseInt($("startYear").value, 10);
+    var m = parseInt($("startMonth").value, 10);
+    var daysSel = $("days").value;
+    var over30 = $("hours").value === "over";
+    var shift = daysSel === "shift";
+
+    $("yearDaysWrap").style.display = shift ? "" : "none";
+
+    if (!y || !m){ err.textContent = "働き始めた年月を選んでください。"; out.innerHTML = ""; return; }
+
+    var months = monthsElapsed(y, m);
+    if (months < 0){ err.textContent = "働き始めた年月が未来になっています。"; out.innerHTML = ""; return; }
+    err.textContent = "";
+
+    // ---- ステップ1：付与対象か ----
+    if (months < 6){
+      var left = 6 - months;
+      var f = ymAfter(y, m, 6);
+      out.innerHTML =
+        '<div class="headline">' +
+          '<p class="cap">勤続 ' + months + 'か月</p>' +
+          '<p class="big none">まだ付与されていません</p>' +
+          '<p class="sub">あと <b>' + left + 'か月</b>（' + f.y + '年' + f.m + '月ごろ）で最初の有給が発生します。' +
+          '継続して6か月働き、全労働日の8割以上出勤していることが条件です。</p>' +
+        '</div>';
+      save();
+      return;
+    }
+
+    // ---- ステップ2：通常付与か比例付与か ----
+    var yearDays = parseInt($("yearDays").value, 10);
+    var weekKind;    // "normal" / 1〜4 / "none"
+    var reason;
+
+    if (over30){
+      weekKind = "normal"; reason = "週の所定労働時間が30時間以上のため";
+    } else if (shift){
+      if (!isFinite(yearDays) || yearDays < 0){ err.textContent = "1年間の所定労働日数を入れてください。"; out.innerHTML = ""; return; }
+      weekKind = weekFromYearDays(yearDays);
+      reason = weekKind === "normal" ? "年間の所定労働日数が217日以上のため"
+             : weekKind === "none"   ? "年間の所定労働日数が47日以下のため"
+             : "年間の所定労働日数が" + yearDays + "日（週" + weekKind + "日に相当）のため";
+    } else {
+      var d = parseInt(daysSel, 10);
+      if (d >= 5){ weekKind = "normal"; reason = "週の所定労働日数が5日以上のため"; }
+      else { weekKind = d; reason = "週30時間未満・週" + d + "日勤務のため"; }
+    }
+
+    if (weekKind === "none"){
+      out.innerHTML =
+        '<div class="headline">' +
+          '<p class="cap">年間の所定労働日数 ' + yearDays + '日</p>' +
+          '<p class="big none">付与の対象外です</p>' +
+          '<p class="sub">年間の所定労働日数が47日以下の場合、比例付与の対象になりません。</p>' +
+        '</div>';
+      save();
+      return;
+    }
+
+    // ---- ステップ3・4：区分と日数 ----
+    var tier = tierOf(months);
+    var table = weekKind === "normal" ? NORMAL : PRO[weekKind];
+    var days = table[tier - 1];
+    var kindLabel = weekKind === "normal" ? "通常付与" : "比例付与";
+
+    // 次に増える時期
+    var nextHtml = "";
+    if (tier < 7){
+      var nx = ymAfter(y, m, TIERS[tier]);
+      var nextDays = table[tier];
+      nextHtml = '<p class="sub"><b>' + nx.y + '年' + nx.m + '月</b>ごろ（勤続' +
+                 (TIERS[tier] / 12 === Math.floor(TIERS[tier] / 12) ? (TIERS[tier] / 12) + '年' : (Math.floor(TIERS[tier] / 12)) + '年6か月') +
+                 '）に <b>' + nextDays + '日</b> へ増えます。</p>';
+    } else {
+      nextHtml = '<p class="sub">勤続6年6か月で上限に達しています。これ以上は増えません。</p>';
+    }
+
+    // 推移グラフ
+    var max = table[6];
+    var rows = "";
+    for (var i = 0; i < 7; i++){
+      var lbl = i === 0 ? "6か月" : (i === 6 ? "6年6か月〜" : (i + 0.5) + "年");
+      rows += '<div class="row' + (i === tier - 1 ? ' now' : '') + '">' +
+                '<span class="lbl">' + lbl + '</span>' +
+                '<span class="track"><i class="fill" style="display:block;width:' + (table[i] / max * 100).toFixed(1) + '%"></i></span>' +
+                '<span class="val">' + table[i] + '日</span>' +
+              '</div>';
+    }
+
+    out.innerHTML =
+      '<div class="headline">' +
+        '<p class="cap">勤続 ' + Math.floor(months / 12) + '年' + (months % 12) + 'か月（区分' + tier + '）</p>' +
+        '<p class="big">' + days + '<small>日</small></p>' +
+        '<p class="sub"><b>' + kindLabel + '</b>です。' + reason + '。</p>' +
+        nextHtml +
+      '</div>' +
+      '<div class="chart">' + rows + '</div>' +
+      (days >= 10
+        ? '<p class="flag ok">年10日以上の付与なので、<b>年5日は必ず取らせることが会社の義務</b>です（労働基準法39条7項）。</p>'
+        : '<p class="flag">付与が年10日未満の場合、会社の「年5日取得させる義務」の対象外です。ただし取る権利はあります。</p>');
+
+    save();
+  }
+
+  function save(){
+    try {
+      var d = {};
+      FIELDS.forEach(function(id){ d[id] = $(id).value; });
+      localStorage.setItem(STORE_KEY, JSON.stringify(d));
+    } catch(e){ /* 保存できなくても計算は続ける */ }
+  }
+
+  function load(){
+    var raw;
+    try { raw = localStorage.getItem(STORE_KEY); } catch(e){ return; }
+    if (!raw) return;
+    var d;
+    try { d = JSON.parse(raw); } catch(e){ return; }
+    if (!d || typeof d !== "object") return;
+    FIELDS.forEach(function(id){
+      var v = d[id];
+      if (v === null || v === undefined || v === "") return;
+      var el = $(id);
+      if (el.tagName === "SELECT"){
+        if ([].some.call(el.options, function(o){ return o.value === String(v); })) el.value = v;
+      } else if (isFinite(parseFloat(v))){
+        el.value = v;
+      }
+    });
+  }
+
+  initSelects();
+  FIELDS.forEach(function(id){
+    $(id).addEventListener("input", render);
+    $(id).addEventListener("change", render);
+  });
+  load();
+  render();
+
+})();
+</script>
+</body>
+</html>

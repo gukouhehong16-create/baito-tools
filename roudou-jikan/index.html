@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="google-site-verification" content="i21F9yP0Ib9K9oosgWtmhbeAzFIP-VBzGh0NO58XHo8" />
+<title>シフト適法チェック｜その働き方、労働基準法に違反していませんか</title>
+<meta name="description" content="シフトを入れるだけで、休憩・労働時間・休日・深夜労働が労働基準法に違反していないか判定します。休憩なし、12時間勤務、6連勤が気になる人へ。無料・登録不要。">
+<meta property="og:title" content="シフト適法チェック｜その働き方、労働基準法に違反していませんか">
+<meta property="og:description" content="シフトを入れるだけ。休憩・労働時間・休日・深夜労働の適法性を判定します。">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://baito-tools.pages.dev/roudou-jikan/">
+<link rel="canonical" href="https://baito-tools.pages.dev/roudou-jikan/">
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#14161f;
+    --paper:#f2f4f7;
+    --card:#ffffff;
+    --line:#dfe3ea;
+    --muted:#6b7280;
+    --indigo:#3d4a7a;
+    --amber:#e8a33d;
+    --rose:#c4566b;
+    --plum:#8e3b6b;
+    --green:#3f7d5c;
+    --break:#d5d9e0;
+    --sans:"Zen Kaku Gothic New",system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;
+    --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0;background:var(--paper);color:var(--ink);
+    font-family:var(--sans);font-weight:400;line-height:1.7;font-size:16px;
+  }
+  .wrap{max-width:680px;margin:0 auto;padding:0 18px 72px}
+
+  header{padding:40px 0 28px}
+  .eyebrow{
+    font-family:var(--mono);font-size:11px;font-weight:600;
+    letter-spacing:.16em;text-transform:uppercase;color:var(--indigo);margin:0 0 12px;
+  }
+  h1{font-size:clamp(28px,7vw,40px);font-weight:700;line-height:1.25;letter-spacing:-.02em;margin:0 0 10px}
+  .lede{margin:0;color:var(--muted);font-size:15px}
+  .lede b{color:var(--ink);font-weight:500}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:16px}
+  .card > h2{font-size:13px;font-weight:700;letter-spacing:.06em;margin:0 0 16px;color:var(--indigo)}
+
+  .grid{display:grid;gap:12px}
+  .g2{grid-template-columns:1fr 1fr}
+  .g4{grid-template-columns:repeat(4,1fr)}
+  @media(max-width:520px){.g4{grid-template-columns:1fr 1fr}.g2{grid-template-columns:1fr}}
+  .field{display:flex;flex-direction:column;gap:5px;min-width:0}
+  .field > span{font-size:12px;color:var(--muted);font-weight:500}
+  input,select{
+    font-family:var(--mono);font-size:16px;font-variant-numeric:tabular-nums;
+    color:var(--ink);background:#fbfcfd;border:1px solid var(--line);
+    border-radius:8px;padding:10px 11px;width:100%;min-width:0;
+  }
+  select{font-family:var(--sans)}
+  input:focus-visible,select:focus-visible{outline:2px solid var(--indigo);outline-offset:1px;border-color:var(--indigo)}
+  button{
+    font-family:var(--sans);font-size:15px;font-weight:700;color:#fff;background:var(--indigo);
+    border:0;border-radius:8px;padding:13px 18px;cursor:pointer;width:100%;margin-top:14px;
+  }
+  button:hover{background:#2f3a63}
+  button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+  .err{color:var(--rose);font-size:13px;font-weight:500;margin:10px 0 0;min-height:1px}
+
+  .shift{padding:14px 0;border-top:1px dashed var(--line)}
+  .shift:first-of-type{border-top:0}
+  .shift-top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .shift-date{font-family:var(--mono);font-size:14px;font-weight:600}
+  .shift-time{font-family:var(--mono);font-size:13px;color:var(--muted)}
+  .shift-work{margin-left:auto;font-family:var(--mono);font-size:13px;font-variant-numeric:tabular-nums}
+  .chips{display:flex;gap:12px;flex-wrap:wrap;font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-top:6px}
+  .del{
+    background:none;border:0;color:var(--muted);font-size:12px;font-weight:500;
+    padding:2px 4px;width:auto;margin:0;cursor:pointer;text-decoration:underline;
+  }
+  .del:hover{color:var(--rose);background:none}
+  .clear-row{display:flex;justify-content:flex-end;margin-top:10px}
+  .clear-all{
+    background:none;border:0;color:var(--muted);font-size:12px;font-weight:500;
+    padding:2px 4px;width:auto;margin:0;cursor:pointer;text-decoration:underline;
+  }
+  .clear-all:hover{color:var(--rose);background:none}
+  .empty{color:var(--muted);font-size:14px;margin:0}
+
+  .verdict{border-radius:10px;padding:18px;text-align:center;border:1px solid var(--line)}
+  .verdict .mark{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.14em;margin:0 0 6px}
+  .verdict .big{font-size:clamp(20px,5.5vw,28px);font-weight:700;letter-spacing:-.01em;margin:0}
+  .verdict .sub{font-size:13px;margin:8px 0 0;color:#3f4450}
+  .v-ok{background:#f1f7f4;border-color:#cfe3d8}
+  .v-ok .mark,.v-ok .big{color:var(--green)}
+  .v-warn{background:#fdf7ec;border-color:#f0dfc0}
+  .v-warn .mark,.v-warn .big{color:#a8761f}
+  .v-bad{background:#fbf1f3;border-color:#eccfd5}
+  .v-bad .mark,.v-bad .big{color:var(--rose)}
+
+  .checks{margin-top:18px}
+  .check{display:flex;gap:11px;padding:11px 0;border-top:1px solid var(--line)}
+  .check:first-child{border-top:0}
+  .check .ic{
+    flex:none;width:18px;height:18px;border-radius:50%;margin-top:3px;
+    font-size:11px;line-height:18px;text-align:center;color:#fff;font-weight:700;
+  }
+  .ic-ok{background:var(--green)}
+  .ic-warn{background:var(--amber)}
+  .ic-bad{background:var(--rose)}
+  .check .body{flex:1;min-width:0}
+  .check .ttl{font-size:13.5px;font-weight:700;margin:0 0 3px}
+  .check .art{font-family:var(--mono);font-size:11px;color:var(--muted);font-weight:400;margin-left:6px}
+  .check .desc{font-size:13px;color:#3f4450;margin:0}
+  .check .desc .num{font-family:var(--mono);font-weight:600;color:var(--ink)}
+
+  .soudan{border-left:3px solid var(--rose);padding:2px 0 2px 13px;margin-top:18px}
+  .soudan h3{font-size:13.5px;font-weight:700;margin:0 0 6px}
+  .soudan p{font-size:13px;color:#3f4450;margin:0 0 5px}
+  .soudan a{color:var(--indigo)}
+
+  .notes h2{font-size:15px;font-weight:700;color:var(--ink);margin:0 0 12px}
+  .notes h3{font-size:13.5px;font-weight:700;margin:20px 0 6px}
+  .notes p,.notes li{font-size:13.5px;color:#3f4450;margin:0 0 9px}
+  .notes .num{font-family:var(--mono);font-weight:600;color:var(--ink)}
+  .notes a{color:var(--indigo)}
+  .caution{border-left:3px solid var(--amber);padding:2px 0 2px 13px;font-size:13px;color:#3f4450;margin:16px 0 0}
+  .src{font-size:12.5px;color:var(--muted);margin:0 0 6px}
+  .src a{color:var(--indigo)}
+  footer{text-align:center;font-size:12px;color:var(--muted);padding-top:26px}
+  footer a{color:var(--indigo)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">労働基準法 32・34・35・60・61条</p>
+    <h1>シフト適法チェック</h1>
+    <p class="lede">休憩なし、長時間、連勤。<b>その働き方が労働基準法に違反していないか</b>を、シフトを入れるだけで判定します。</p>
+  </header>
+
+  <section class="card">
+    <h2>条件</h2>
+    <div class="grid g2">
+      <label class="field"><span>年齢</span>
+        <select id="age">
+          <option value="adult">18歳以上</option>
+          <option value="minor">18歳未満</option>
+        </select>
+      </label>
+      <label class="field"><span>週の起算曜日</span>
+        <select id="weekStart">
+          <option value="0">日曜はじまり</option>
+          <option value="1">月曜はじまり</option>
+        </select>
+      </label>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>シフトを追加</h2>
+    <div class="grid g4">
+      <label class="field"><span>日付</span><input id="date" type="date"></label>
+      <label class="field"><span>開始</span><input id="start" type="time" value="09:00"></label>
+      <label class="field"><span>終了</span><input id="end" type="time" value="18:00"></label>
+      <label class="field"><span>休憩（分）</span><input id="brk" type="number" inputmode="numeric" value="60" min="0" step="15"></label>
+    </div>
+    <button id="add">シフトを追加する</button>
+    <p class="err" id="err" role="status" aria-live="polite"></p>
+  </section>
+
+  <section class="card">
+    <h2>登録したシフト</h2>
+    <div id="list"><p class="empty">シフトを1件追加すると、実労働時間と判定がここに出ます。</p></div>
+    <div class="clear-row"><button type="button" class="clear-all" id="clearAll">登録したシフトを全部消す</button></div>
+  </section>
+
+  <section class="card">
+    <h2>判定</h2>
+    <div id="result"><p class="empty">まだ判定するシフトがありません。</p></div>
+  </section>
+
+  <section class="card notes">
+    <h2>このツールの前提</h2>
+    <p>このツールは<b>労働基準法の主要な条文のみ</b>を見ています。実際の判断は労働基準監督署に確認してください。業種や事業場の規模による例外（特例措置対象事業場など）は考慮していません。</p>
+    <p><b>36協定（サブロク協定）の有無はツールでは判定できません。</b> 1日8時間・週40時間を超える労働は、36協定が結ばれていて初めて適法になります。結ばれているかは勤務先に確認してください。</p>
+    <p>「合意した」「サインした」としても、<b>労働基準法を下回る条件は無効</b>です（労働基準法13条）。契約書にそう書いてあっても、法律のほうが優先されます。</p>
+  </section>
+
+  <section class="card notes">
+    <h2>よくある疑問</h2>
+
+    <h3>休憩なしで6時間働いたけど違法？</h3>
+    <p><b>6時間ちょうどなら休憩は不要です。</b> 労働基準法34条が休憩を義務づけているのは「6時間を超える」場合なので、6時間ちょうどは適法です。ただし<span class="num">6時間を1分でも超えたら45分以上</span>が必要になります。6時間1分でも45分です。</p>
+
+    <h3>休憩中に電話番を頼まれるのは休憩？</h3>
+    <p>休憩ではありません。休憩は<b>自由に使えないといけない</b>と定められています（労働基準法34条3項）。レジや電話にすぐ対応できるよう待機を命じられている時間は<span class="num">手待ち時間</span>として労働時間に含まれ、給料も発生します。</p>
+
+    <h3>「うちは労基法適用外」と言われた</h3>
+    <p>そういうことはありません。<b>アルバイトも労働者</b>なので、労働基準法が適用されます。個人事業主として業務委託契約を結んでいる場合でも、実態が指揮命令を受けた労働なら労働者と判断されることがあります。</p>
+
+    <h3>通報したらバレる？</h3>
+    <p>労働基準監督署への申告を理由とする不利益な取扱いは、<b>労働基準法104条2項で禁止されています</b>。申告者が誰かを事業主に伝えない運用が取られています。解雇や減給などの報復があれば、それ自体が違法です。</p>
+
+    <p class="caution">ここに書いた内容は一般的な法律の説明です。実際の判断は個別の事情によって変わります。判断に迷う場合は労働基準監督署に相談してください。</p>
+  </section>
+
+  <section class="card notes">
+    <h2>出典</h2>
+    <p class="src">労働時間 — <a href="">労働基準法 第32条</a></p>
+    <p class="src">休憩 — <a href="">労働基準法 第34条</a></p>
+    <p class="src">休日 — <a href="">労働基準法 第35条</a></p>
+    <p class="src">年少者の労働時間・深夜業 — <a href="">労働基準法 第60条・第61条</a></p>
+    <p class="src" style="margin-top:14px">割増賃金がいくらになるかは <a href="/kyuryo/">バイト給料計算機</a> で計算できます。深夜割増と残業割増が重なる時間も1.5倍まで対応しています。</p>
+  </section>
+
+  <footer>
+    判定は目安です。実際の判断は労働基準監督署に確認してください。<br>
+    入力したデータはこの端末のブラウザにのみ保存されます。サーバーには送信されません。
+  </footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var shifts = [], seq = 0;
+  var $ = function(id){ return document.getElementById(id); };
+  var STORE_KEY = "roudouJikan.v1";
+  var NIGHT_FROM = 22*60, NIGHT_TO = 5*60;
+  var LEGAL_DAY = 480;       // 労基法32条2項：1日8時間
+  var LEGAL_WEEK = 2400;     // 労基法32条1項：週40時間
+  var BRK_6H = 360, BRK_8H = 480;
+
+  function toMin(hhmm){
+    var p = String(hhmm).split(":");
+    return (parseInt(p[0],10)||0)*60 + (parseInt(p[1],10)||0);
+  }
+  function hm(min){
+    var h = Math.floor(min/60), m = min%60;
+    return m ? h + "時間" + m + "分" : h + "時間";
+  }
+  function fmtDate(iso){
+    var d = new Date(iso + "T00:00:00");
+    var w = ["日","月","火","水","木","金","土"][d.getDay()];
+    return (d.getMonth()+1) + "/" + d.getDate() + "（" + w + "）";
+  }
+
+  // 1シフトの実労働時間と深夜労働の有無
+  function analyse(sh){
+    var s = toMin(sh.start), e = toMin(sh.end);
+    if (e <= s) e += 1440;
+    var span = e - s;
+    var brk = Math.min(sh.brk, span);
+    var work = span - brk;
+    var night = 0;
+    for (var i = 0; i < span; i++){
+      var clock = (s + i) % 1440;
+      if (clock >= NIGHT_FROM || clock < NIGHT_TO) night++;
+    }
+    // 休憩は深夜帯にかからない前提で概算（深夜の有無の判定にのみ使う）
+    return { span:span, brk:brk, work:work, night:night };
+  }
+
+  // 週の起算日に合わせた週キー
+  function weekKey(iso, startDow){
+    var d = new Date(iso + "T00:00:00");
+    var diff = (d.getDay() - startDow + 7) % 7;
+    d.setDate(d.getDate() - diff);
+    return d.getFullYear() + "-" + (d.getMonth()+1) + "-" + d.getDate();
+  }
+
+  function judge(){
+    var minor = $("age").value === "minor";
+    var startDow = parseInt($("weekStart").value, 10);
+    var checks = [];
+
+    // ---- 判定1：休憩（労基法34条）----
+    var brkNg = [];
+    shifts.forEach(function(sh){
+      var a = analyse(sh);
+      var need = a.work > BRK_8H ? 60 : (a.work > BRK_6H ? 45 : 0);
+      if (a.brk < need) brkNg.push({ sh:sh, work:a.work, brk:a.brk, need:need });
+    });
+    checks.push(brkNg.length ? {
+      level:"bad", ttl:"休憩が足りていません", art:"労基法34条",
+      desc: brkNg.map(function(x){
+        return fmtDate(x.sh.date) + "：<span class=\"num\">" + hm(x.work) + "</span>働いて休憩<span class=\"num\">" +
+               x.brk + "分</span>。あと<span class=\"num\">" + (x.need - x.brk) + "分</span>必要です";
+      }).join("<br>")
+    } : {
+      level:"ok", ttl:"休憩は足りています", art:"労基法34条",
+      desc:"6時間を超えるなら45分、8時間を超えるなら60分の休憩が必要です。すべてのシフトで満たしています。"
+    });
+
+    // ---- 判定2：1日の労働時間（労基法32条2項）----
+    var dayOver = shifts.filter(function(sh){ return analyse(sh).work > LEGAL_DAY; });
+    checks.push(dayOver.length ? {
+      level:"warn", ttl:"1日8時間を超えています", art:"労基法32条2項",
+      desc: dayOver.map(function(sh){
+        var a = analyse(sh);
+        return fmtDate(sh.date) + "：実労働<span class=\"num\">" + hm(a.work) + "</span>（8時間を<span class=\"num\">" +
+               hm(a.work - LEGAL_DAY) + "</span>超過）";
+      }).join("<br>") + "<br>36協定が結ばれていれば適法です。ただし超過分には割増賃金が必要です。"
+    } : {
+      level:"ok", ttl:"1日の労働時間は8時間以内です", art:"労基法32条2項",
+      desc:"法定労働時間の範囲に収まっています。"
+    });
+
+    // ---- 判定3：週の労働時間（労基法32条1項）----
+    var weeks = {};
+    shifts.forEach(function(sh){
+      var k = weekKey(sh.date, startDow);
+      if (!weeks[k]) weeks[k] = { work:0, days:{} };
+      weeks[k].work += analyse(sh).work;
+      weeks[k].days[sh.date] = true;
+    });
+    var weekOver = Object.keys(weeks).filter(function(k){ return weeks[k].work > LEGAL_WEEK; });
+    checks.push(weekOver.length ? {
+      level:"warn", ttl:"週40時間を超えています", art:"労基法32条1項",
+      desc: weekOver.map(function(k){
+        return k.replace(/-/g,"/") + "の週：合計<span class=\"num\">" + hm(weeks[k].work) + "</span>（40時間を<span class=\"num\">" +
+               hm(weeks[k].work - LEGAL_WEEK) + "</span>超過）";
+      }).join("<br>") + "<br>36協定が結ばれていれば適法です。ただし超過分には割増賃金が必要です。"
+    } : {
+      level:"ok", ttl:"週の労働時間は40時間以内です", art:"労基法32条1項",
+      desc:"入力されたシフトの範囲では、週の合計が40時間を超えていません。"
+    });
+
+    // ---- 判定4：休日（労基法35条）----
+    var noRest = Object.keys(weeks).filter(function(k){ return Object.keys(weeks[k].days).length >= 7; });
+    checks.push(noRest.length ? {
+      level:"bad", ttl:"週に1日も休みがありません", art:"労基法35条",
+      desc: noRest.map(function(k){ return k.replace(/-/g,"/") + "の週：<span class=\"num\">7日連続</span>で勤務"; }).join("<br>") +
+            "<br>週1日、または4週で4日の休日が必要です。"
+    } : {
+      level:"ok", ttl:"休日は確保されています", art:"労基法35条",
+      desc:"入力されたシフトの範囲では、週に1日以上の休みがあります。"
+    });
+
+    // ---- 判定5：深夜労働（労基法61条）----
+    var nightShifts = shifts.filter(function(sh){ return analyse(sh).night > 0; });
+    if (minor){
+      checks.push(nightShifts.length ? {
+        level:"bad", ttl:"18歳未満が深夜に働いています", art:"労基法61条",
+        desc: nightShifts.map(function(sh){
+          return fmtDate(sh.date) + "：" + sh.start + "–" + sh.end + "（深夜帯<span class=\"num\">" + hm(analyse(sh).night) + "</span>）";
+        }).join("<br>") + "<br>18歳未満は22時から5時まで働けません。"
+      } : {
+        level:"ok", ttl:"深夜の労働はありません", art:"労基法61条",
+        desc:"18歳未満は22時から5時まで働けません。入力されたシフトはこの時間帯にかかっていません。"
+      });
+    } else {
+      checks.push(nightShifts.length ? {
+        level:"warn", ttl:"深夜割増の対象があります", art:"労基法37条4項",
+        desc: nightShifts.map(function(sh){
+          return fmtDate(sh.date) + "：深夜帯に<span class=\"num\">" + hm(analyse(sh).night) + "</span>";
+        }).join("<br>") + "<br>18歳以上なので適法です。ただし22時〜5時は25%以上の割増賃金が必要です。"
+      } : {
+        level:"ok", ttl:"深夜の労働はありません", art:"労基法37条4項",
+        desc:"22時〜5時にかかるシフトはありません。"
+      });
+    }
+
+    // ---- 判定6：18歳未満の労働時間（労基法60条）----
+    if (minor){
+      var mDay = shifts.filter(function(sh){ return analyse(sh).work > LEGAL_DAY; });
+      var mWeek = Object.keys(weeks).filter(function(k){ return weeks[k].work > LEGAL_WEEK; });
+      checks.push((mDay.length || mWeek.length) ? {
+        level:"bad", ttl:"18歳未満が法定労働時間を超えています", art:"労基法60条",
+        desc:"18歳未満は36協定があっても、原則として1日8時間・週40時間を超えて働けません。" +
+             (mDay.length ? "<br>1日8時間超：<span class=\"num\">" + mDay.length + "件</span>" : "") +
+             (mWeek.length ? "<br>週40時間超：<span class=\"num\">" + mWeek.length + "週</span>" : "")
+      } : {
+        level:"ok", ttl:"18歳未満の労働時間の上限内です", art:"労基法60条",
+        desc:"1日8時間・週40時間を超えていません。"
+      });
+    }
+
+    return checks;
+  }
+
+  function render(){
+    var list = $("list"), out = $("result");
+
+    if (!shifts.length){
+      list.innerHTML = '<p class="empty">シフトを1件追加すると、実労働時間と判定がここに出ます。</p>';
+      out.innerHTML = '<p class="empty">まだ判定するシフトがありません。</p>';
+      return;
+    }
+
+    shifts.sort(function(a,b){
+      return a.date === b.date ? toMin(a.start) - toMin(b.start) : (a.date < b.date ? -1 : 1);
+    });
+
+    list.innerHTML = shifts.map(function(sh){
+      var a = analyse(sh);
+      return '<div class="shift">' +
+               '<div class="shift-top">' +
+                 '<span class="shift-date">' + fmtDate(sh.date) + '</span>' +
+                 '<span class="shift-time">' + sh.start + '–' + sh.end + '</span>' +
+                 '<span class="shift-work">実労働 ' + hm(a.work) + '</span>' +
+               '</div>' +
+               '<div class="chips">拘束 ' + hm(a.span) + '　休憩 ' + a.brk + '分' +
+                 (a.night ? '　深夜 ' + hm(a.night) : '') +
+                 '<button class="del" data-id="' + sh.id + '">削除</button>' +
+               '</div>' +
+             '</div>';
+    }).join("");
+
+    Array.prototype.forEach.call(list.querySelectorAll(".del"), function(b){
+      b.addEventListener("click", function(){
+        var id = parseInt(b.getAttribute("data-id"), 10);
+        shifts = shifts.filter(function(s){ return s.id !== id; });
+        save(); render();
+      });
+    });
+
+    var checks = judge();
+    var worst = checks.some(function(c){ return c.level === "bad"; }) ? "bad"
+              : checks.some(function(c){ return c.level === "warn"; }) ? "warn" : "ok";
+
+    var head = {
+      ok:   { cls:"v-ok",   mark:"NO ISSUES FOUND", big:"問題は見つかりませんでした",
+              sub:"主要な条文の範囲では、違反の可能性は見つかりませんでした。" },
+      warn: { cls:"v-warn", mark:"EXTRA PAY REQUIRED", big:"割増賃金の対象があります",
+              sub:"違法とは限りませんが、割増賃金や36協定の確認が必要な項目があります。" },
+      bad:  { cls:"v-bad",  mark:"POSSIBLE VIOLATION", big:"違法の可能性があります",
+              sub:"労働基準法に違反している可能性がある項目があります。下の内容を確認してください。" }
+    }[worst];
+
+    out.innerHTML =
+      '<div class="verdict ' + head.cls + '">' +
+        '<p class="mark">' + head.mark + '</p>' +
+        '<p class="big">' + head.big + '</p>' +
+        '<p class="sub">' + head.sub + '</p>' +
+      '</div>' +
+      '<div class="checks">' +
+        checks.map(function(c){
+          var ic = c.level === "ok" ? '<span class="ic ic-ok">✓</span>'
+                 : c.level === "warn" ? '<span class="ic ic-warn">!</span>'
+                 : '<span class="ic ic-bad">!</span>';
+          return '<div class="check">' + ic +
+                   '<div class="body">' +
+                     '<p class="ttl">' + c.ttl + '<span class="art">' + c.art + '</span></p>' +
+                     '<p class="desc">' + c.desc + '</p>' +
+                   '</div>' +
+                 '</div>';
+        }).join("") +
+      '</div>' +
+      (worst === "bad"
+        ? '<div class="soudan">' +
+            '<h3>相談できるところ</h3>' +
+            '<p><a href="">労働基準監督署（総合労働相談コーナー）</a> — 全国の労働局・監督署に設置。無料で相談できます</p>' +
+            '<p><a href="">労働条件相談ほっとライン</a> — 夜間・土日も対応</p>' +
+            '<p>申告を理由とする不利益な取扱いは労働基準法104条2項で禁止されています。</p>' +
+          '</div>'
+        : "");
+
+    save();
+  }
+
+  function save(){
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify({
+        shifts: shifts, age: $("age").value, weekStart: $("weekStart").value
+      }));
+    } catch(e){ /* 保存できなくても判定は続ける */ }
+  }
+
+  function load(){
+    var raw;
+    try { raw = localStorage.getItem(STORE_KEY); } catch(e){ return; }
+    if (!raw) return;
+    var d;
+    try { d = JSON.parse(raw); } catch(e){ return; }
+    if (!d || typeof d !== "object") return;
+
+    if (d.age === "adult" || d.age === "minor") $("age").value = d.age;
+    if (d.weekStart === "0" || d.weekStart === "1") $("weekStart").value = d.weekStart;
+
+    if (!Array.isArray(d.shifts)) return;
+    var used = {}, max = 0, restored = [];
+    d.shifts.forEach(function(s){
+      if (!s || typeof s !== "object") return;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(s.date)) return;
+      if (!/^\d{1,2}:\d{2}$/.test(s.start) || !/^\d{1,2}:\d{2}$/.test(s.end)) return;
+      var id = parseInt(s.id, 10);
+      if (!isFinite(id) || id <= 0 || used[id]) id = max + 1;
+      used[id] = true;
+      if (id > max) max = id;
+      var brk = parseFloat(s.brk);
+      if (!isFinite(brk) || brk < 0) brk = 0;
+      restored.push({ id:id, date:s.date, start:s.start, end:s.end, brk:brk });
+    });
+    shifts = restored;
+    seq = max;   // 再読み込み後にIDが衝突しないようにする
+  }
+
+  $("add").addEventListener("click", function(){
+    var err = $("err");
+    var date = $("date").value, start = $("start").value, end = $("end").value;
+    if (!date){ err.textContent = "日付を入れてください。"; $("date").focus(); return; }
+    if (!start || !end){ err.textContent = "開始と終了の時刻を入れてください。"; return; }
+    if (start === end){ err.textContent = "開始と終了が同じ時刻です。"; return; }
+    var s = toMin(start), e = toMin(end);
+    if (e <= s) e += 1440;
+    var brk = Math.max(0, parseFloat($("brk").value) || 0);
+    if (brk >= e - s){ err.textContent = "休憩が拘束時間以上になっています。"; return; }
+    err.textContent = "";
+    shifts.push({ id: ++seq, date:date, start:start, end:end, brk:brk });
+    save(); render();
+  });
+
+  $("clearAll").addEventListener("click", function(){
+    if (!window.confirm("登録したシフトをすべて消します。よろしいですか？")) return;
+    shifts = []; seq = 0;
+    save(); render();
+  });
+
+  ["age","weekStart"].forEach(function(id){
+    $(id).addEventListener("change", function(){ save(); render(); });
+  });
+
+  var t = new Date();
+  $("date").value = t.getFullYear() + "-" +
+    String(t.getMonth()+1).padStart(2,"0") + "-" +
+    String(t.getDate()).padStart(2,"0");
+
+  load();
+  render();
+
+})();
+</script>
+</body>
+</html>

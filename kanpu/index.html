@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="google-site-verification" content="i21F9yP0Ib9K9oosgWtmhbeAzFIP-VBzGh0NO58XHo8" />
+<title>バイトの給料から引かれた所得税、戻ってくる？｜還付の判定</title>
+<meta name="description" content="給料から引かれた所得税が戻るか判定します。年収160万円以下なら全額戻る可能性が高い。令和8年分の新しい基準（月額105,000円）に対応。88,000円は古い数字です。">
+<meta property="og:title" content="バイトの給料から引かれた所得税、戻ってくる？｜還付の判定">
+<meta property="og:description" content="引かれた所得税が戻るかを判定し、年末調整だけでよいか確定申告が必要かを案内します。">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://baito-tools.pages.dev/kanpu/">
+<link rel="canonical" href="https://baito-tools.pages.dev/kanpu/">
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#14161f;
+    --paper:#f2f4f7;
+    --card:#ffffff;
+    --line:#dfe3ea;
+    --muted:#6b7280;
+    --indigo:#3d4a7a;
+    --amber:#e8a33d;
+    --rose:#c4566b;
+    --plum:#8e3b6b;
+    --green:#3f7d5c;
+    --break:#d5d9e0;
+    --sans:"Zen Kaku Gothic New",system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;
+    --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0;background:var(--paper);color:var(--ink);
+    font-family:var(--sans);font-weight:400;line-height:1.7;font-size:16px;
+  }
+  .wrap{max-width:680px;margin:0 auto;padding:0 18px 72px}
+
+  header{padding:40px 0 28px}
+  .eyebrow{
+    font-family:var(--mono);font-size:11px;font-weight:600;
+    letter-spacing:.16em;text-transform:uppercase;color:var(--indigo);margin:0 0 12px;
+  }
+  h1{font-size:clamp(28px,7vw,40px);font-weight:700;line-height:1.25;letter-spacing:-.02em;margin:0 0 10px}
+  .lede{margin:0;color:var(--muted);font-size:15px}
+  .lede b{color:var(--ink);font-weight:500}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:16px}
+  .card > h2{font-size:13px;font-weight:700;letter-spacing:.06em;margin:0 0 16px;color:var(--indigo)}
+
+  .grid{display:grid;gap:12px}
+  .g2{grid-template-columns:1fr 1fr}
+  @media(max-width:520px){.g2{grid-template-columns:1fr}}
+  .field{display:flex;flex-direction:column;gap:5px;min-width:0}
+  .field > span{font-size:12px;color:var(--muted);font-weight:500}
+  input,select{
+    font-family:var(--mono);font-size:16px;font-variant-numeric:tabular-nums;
+    color:var(--ink);background:#fbfcfd;border:1px solid var(--line);
+    border-radius:8px;padding:10px 11px;width:100%;min-width:0;
+  }
+  select{font-family:var(--sans)}
+  input:focus-visible,select:focus-visible{outline:2px solid var(--indigo);outline-offset:1px;border-color:var(--indigo)}
+  .full{margin-top:12px}
+
+  .headline{background:#fbfcfd;border:1px solid var(--line);border-radius:10px;padding:20px 18px;text-align:center}
+  .headline .cap{font-size:13px;color:var(--muted);margin:0 0 6px}
+  .headline .big{
+    font-family:var(--mono);font-variant-numeric:tabular-nums;
+    font-size:clamp(30px,9vw,46px);font-weight:600;letter-spacing:-.02em;line-height:1.15;margin:0;
+  }
+  .headline .big small{font-size:.42em;font-weight:400;color:var(--muted);margin-left:4px}
+  .headline .big.none{color:var(--muted);font-size:clamp(20px,5vw,26px)}
+  .headline .big.part{color:var(--amber)}
+  .headline .sub{font-size:13.5px;color:#3f4450;margin:10px 0 0}
+  .headline .sub b{font-family:var(--mono);font-weight:600}
+
+  .step{border:1px solid var(--line);border-radius:10px;padding:16px;margin-top:16px}
+  .step h3{font-size:13.5px;font-weight:700;margin:0 0 8px;color:var(--indigo)}
+  .step p{font-size:13px;color:#3f4450;margin:0 0 7px}
+  .step p:last-child{margin-bottom:0}
+  .step .num{font-family:var(--mono);font-weight:600;color:var(--ink)}
+  .step.need{border-left:3px solid var(--amber)}
+  .step.easy{border-left:3px solid var(--green)}
+
+  .list{margin-top:16px}
+  .list h3{font-size:13.5px;font-weight:700;margin:0 0 8px}
+  .list ul{list-style:none;padding:0;margin:0}
+  .list li{font-size:13px;color:#3f4450;padding:7px 0 7px 24px;position:relative;border-top:1px solid var(--line)}
+  .list li:first-child{border-top:0}
+  .list li::before{
+    content:"□";position:absolute;left:2px;top:7px;
+    font-family:var(--mono);color:var(--indigo);font-weight:600;
+  }
+
+  .notes h2{font-size:15px;font-weight:700;color:var(--ink);margin:0 0 12px}
+  .notes h3{font-size:13.5px;font-weight:700;margin:20px 0 6px}
+  .notes p,.notes li{font-size:13.5px;color:#3f4450;margin:0 0 9px}
+  .notes .num{font-family:var(--mono);font-weight:600;color:var(--ink)}
+  .notes a{color:var(--indigo)}
+  .caution{border-left:3px solid var(--amber);padding:2px 0 2px 13px;font-size:13px;color:#3f4450;margin:16px 0 0}
+  .src{font-size:12.5px;color:var(--muted);margin:0 0 6px}
+  .src a{color:var(--indigo)}
+  .asof{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--muted);margin:0 0 14px}
+  footer{text-align:center;font-size:12px;color:var(--muted);padding-top:26px}
+  footer a{color:var(--indigo)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">令和8年分 対応</p>
+    <h1>引かれた所得税は戻る？</h1>
+    <p class="lede">給料から所得税が引かれていても、<b>多くの場合そのお金は戻ってきます</b>。年収と引かれた額を入れると、戻るかどうかと必要な手続きが出ます。</p>
+  </header>
+
+  <section class="card">
+    <h2>あなたの状況</h2>
+    <div class="grid g2">
+      <label class="field"><span>今年の給与収入の見込み（円）</span>
+        <input id="income" type="number" inputmode="numeric" value="1200000" min="0" step="10000"></label>
+      <label class="field"><span>これまでに引かれた所得税の合計（円）</span>
+        <input id="tax" type="number" inputmode="numeric" value="5000" min="0" step="100"></label>
+    </div>
+    <label class="field full"><span>バイト先の数</span>
+      <select id="places">
+        <option value="1">1か所</option>
+        <option value="2">2か所以上（掛け持ち）</option>
+      </select>
+    </label>
+    <label class="field full"><span>「給与所得者の扶養控除等（異動）申告書」を出した？</span>
+      <select id="decl">
+        <option value="yes">出した</option>
+        <option value="no">出していない</option>
+        <option value="unknown">わからない</option>
+      </select>
+    </label>
+    <label class="field full"><span>12月時点でそのバイト先に在籍している？</span>
+      <select id="dec">
+        <option value="yes">はい</option>
+        <option value="no">いいえ（年内に辞めた／辞める）</option>
+      </select>
+    </label>
+  </section>
+
+  <section class="card">
+    <h2>判定</h2>
+    <div id="result"></div>
+  </section>
+
+  <section class="card notes">
+    <h2>知っておくこと</h2>
+    <p class="asof">最終確認日：2026年7月29日</p>
+    <p><b>源泉徴収票がないと手続きできません。</b> 辞めたバイト先にも請求できます。交付は法律上の義務なので、断られる筋合いのものではありません。</p>
+    <p>還付申告は<span class="num">5年前</span>までさかのぼれます。去年・一昨年に引かれた分も、まだ戻せる可能性があります。</p>
+    <p><b>住民税は別の話です。</b> 所得税が全額戻っても、住民税がかかることはあります。住民税の非課税ラインは自治体により異なります。</p>
+    <p>このツールが出す金額は概算です。正確な額は年末調整または確定申告で確定します。</p>
+  </section>
+
+  <section class="card notes">
+    <h2>よくある疑問</h2>
+
+    <h3>なぜ引かれているのに戻ってくるの？</h3>
+    <p>毎月の源泉徴収は<b>「仮の金額」</b>だからです。1年の収入が確定してから精算する仕組みになっていて、その精算が年末調整や確定申告です。1年を通して見れば税金がかからない収入でも、月によって多く稼いだ月があれば、その月は引かれます。</p>
+
+    <h3>88,000円の壁って聞いたけど？</h3>
+    <p><b>その数字はもう古いです。</b> 令和8年1月から、源泉徴収税額表で税額がゼロになる上限が<span class="num">月額88,000円</span>から<span class="num">月額105,000円</span>に引き上げられました。月10万円くらいまでなら、そもそも引かれません。ネット上の記事の多くは古い数字のままなので注意してください。</p>
+
+    <h3>掛け持ちしていると何が違う？</h3>
+    <p>2か所目は<span class="num">乙欄</span>という高い率で引かれます。「給与所得者の扶養控除等（異動）申告書」は1か所にしか出せないため、出していないほうが乙欄になる仕組みです。<b>確定申告をしないと戻りません</b>が、その分だけ戻る金額は大きくなります。</p>
+
+    <h3>確定申告って難しい？</h3>
+    <p>還付だけなら難しくありません。<b>源泉徴収票の数字を入力するだけ</b>です。e-Tax ならスマホで完結し、税務署に行く必要もありません。所要時間は30分ほどです。</p>
+
+    <h3>親の扶養から外れる？</h3>
+    <p>還付を受けること自体は扶養に影響しません。影響するのは<b>年収の額</b>です。いくらまで働けるかは <a href="/nenshu-kabe/">年収の壁 判定ツール</a> で確認できます。19〜22歳の学生なら150万円が実質の壁になります。</p>
+
+    <p class="caution">ここに書いた内容は一般的な制度の説明です。実際の還付額は他の控除や収入の状況によって変わります。判断に迷う場合は、勤務先または税務署に確認してください。</p>
+  </section>
+
+  <section class="card notes">
+    <h2>出典</h2>
+    <p class="src">月額105,000円未満で源泉徴収税額がゼロ（甲欄・扶養親族等0人） — <a href="https://www.nta.go.jp/publication/pamph/gensen/zeigakuhyo2026/01.htm" target="_blank" rel="noopener">国税庁「令和8年分 源泉徴収税額表」</a></p>
+    <p class="src">給与所得控除65万円・基礎控除95万円 — <a href="https://www.nta.go.jp/users/gensen/2025kiso/index.htm" target="_blank" rel="noopener">国税庁「令和7年度税制改正による所得税の基礎控除の見直し等について」</a></p>
+    <p class="src" style="margin-top:14px">給料そのものの計算は <a href="/kyuryo/">バイト給料計算機</a> をどうぞ。深夜手当・残業手当こみで支給額が出ます。</p>
+  </section>
+
+  <footer>
+    金額は概算です。正確な額は年末調整または確定申告で確定します。<br>
+    入力したデータはこの端末のブラウザにのみ保存されます。サーバーには送信されません。
+  </footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var $ = function(id){ return document.getElementById(id); };
+  var STORE_KEY = "kanpu.v1";
+  var FIELDS = ["income","tax","places","decl","dec"];
+
+  // 令和8年分の基準額
+  var TAXFREE_INCOME = 1600000;   // 給与所得控除65万＋基礎控除95万
+  var MONTHLY_ZERO   = 105000;    // 甲欄・扶養0人で源泉徴収がゼロになる上限（未満）
+
+  function yen(n){ return Math.round(n).toLocaleString("ja-JP"); }
+  function numOf(id){
+    var v = parseFloat($(id).value);
+    return isFinite(v) && v >= 0 ? v : 0;
+  }
+
+  function render(){
+    var income = numOf("income");
+    var tax = numOf("tax");
+    var multi = $("places").value === "2";
+    var decl = $("decl").value;
+    var atDec = $("dec").value === "yes";
+
+    // ---- 戻る金額の判定 ----
+    var head;
+    if (tax <= 0){
+      head =
+        '<div class="headline">' +
+          '<p class="cap">引かれた所得税 0円</p>' +
+          '<p class="big none">戻ってくるお金はありません</p>' +
+          '<p class="sub">そもそも引かれていないので、還付されるものがありません。' +
+          '月額<b>' + yen(MONTHLY_ZERO) + '円</b>未満なら、毎月の源泉徴収はゼロです。</p>' +
+        '</div>';
+    } else if (income <= TAXFREE_INCOME){
+      head =
+        '<div class="headline">' +
+          '<p class="cap">年収 ' + yen(income) + '円 は所得税がかからない範囲です</p>' +
+          '<p class="big">' + yen(tax) + '<small>円</small></p>' +
+          '<p class="sub">引かれた金額は<b>全額戻ってくる可能性が高い</b>です。' +
+          '年収<b>' + yen(TAXFREE_INCOME) + '円</b>までは所得税がかかりません' +
+          '（給与所得控除65万円＋基礎控除95万円）。</p>' +
+        '</div>';
+    } else {
+      head =
+        '<div class="headline">' +
+          '<p class="cap">年収 ' + yen(income) + '円 は所得税がかかる範囲です</p>' +
+          '<p class="big part">一部が戻ります</p>' +
+          '<p class="sub">年収が<b>' + yen(TAXFREE_INCOME) + '円</b>を超えているため、全額は戻りません。' +
+          '正確な金額は年末調整または確定申告で確定します。</p>' +
+        '</div>';
+    }
+
+    // ---- 手続きの案内 ----
+    var step = "";
+    if (tax <= 0){
+      step = '<div class="step"><h3>手続き</h3>' +
+             '<p>還付される税金がないため、還付のための手続きは不要です。</p></div>';
+    } else if (multi){
+      step = '<div class="step need"><h3>確定申告が必要です</h3>' +
+             '<p>バイト先が2か所以上あるため、<b>年末調整だけでは完結しません</b>。</p>' +
+             '<p>2か所目は<span class="num">乙欄</span>で多めに引かれているため、戻る金額が大きくなることがあります。' +
+             'すべてのバイト先から源泉徴収票を集めてください。</p></div>';
+    } else if (!atDec){
+      step = '<div class="step need"><h3>確定申告が必要です</h3>' +
+             '<p>12月時点で在籍していないため、<b>年末調整を受けられません</b>。</p>' +
+             '<p>辞めたバイト先から<span class="num">源泉徴収票</span>を必ず受け取ってください。' +
+             'これがないと手続きできません。交付は勤務先の義務です。</p></div>';
+    } else if (decl === "no" || decl === "unknown"){
+      step = '<div class="step need"><h3>まず勤務先に確認してください</h3>' +
+             '<p>「給与所得者の扶養控除等（異動）申告書」を出していない場合、' +
+             '<span class="num">乙欄</span>という高い税率で引かれている可能性があります。</p>' +
+             '<p>提出済みなら年末調整で戻ります。未提出なら、確定申告で取り戻せます。' +
+             'どちらの扱いになっているか勤務先に聞いてみてください。</p></div>';
+    } else {
+      step = '<div class="step easy"><h3>手続きは不要です</h3>' +
+             '<p>バイト先が1か所、申告書を提出済み、12月に在籍。この3つがそろっているので、' +
+             '<b>勤務先の年末調整で自動的に戻ります</b>。</p>' +
+             '<p>12月または1月の給料に上乗せされる形で返ってくるのが一般的です。</p></div>';
+    }
+
+    // ---- 書類チェックリスト ----
+    var needFiling = tax > 0 && (multi || !atDec || decl === "no" || decl === "unknown");
+    var docs = "";
+    if (tax > 0){
+      var items = ['<li>源泉徴収票（バイト先ごとに1枚。年末〜1月に配られます）</li>'];
+      if (needFiling){
+        items.push('<li>マイナンバーカード（またはマイナンバー通知カード＋本人確認書類）</li>');
+        items.push('<li>還付金の振込先になる本人名義の銀行口座</li>');
+        items.push('<li>e-Tax を使う場合はスマホ（マイナポータルアプリ）</li>');
+      }
+      docs = '<div class="list"><h3>必要なもの</h3><ul>' + items.join("") + '</ul></div>';
+    }
+
+    // ---- 期限 ----
+    var limit = "";
+    if (needFiling){
+      limit = '<div class="step"><h3>期限</h3>' +
+              '<p>確定申告の期間は原則<span class="num">2月16日〜3月15日</span>です。' +
+              'ただし<b>還付だけの申告なら、翌年1月1日から提出できます</b>。混む時期を避けられます。</p>' +
+              '<p>還付申告は<span class="num">5年</span>さかのぼれます。今年の分を逃しても、後から取り戻せます。' +
+              '去年・一昨年の分が未処理なら、それも一緒に申告できます。</p></div>';
+    } else if (tax > 0){
+      limit = '<div class="step"><h3>期限</h3>' +
+              '<p>年末調整は勤務先が手続きします。11月ごろに書類を渡されるので、期限までに提出してください。</p>' +
+              '<p>もし年末調整を受け損ねても、確定申告で取り戻せます。還付申告は<span class="num">5年</span>さかのぼれます。</p></div>';
+    }
+
+    $("result").innerHTML = head + step + docs + limit;
+    save();
+  }
+
+  function save(){
+    try {
+      var d = {};
+      FIELDS.forEach(function(id){ d[id] = $(id).value; });
+      localStorage.setItem(STORE_KEY, JSON.stringify(d));
+    } catch(e){ /* 保存できなくても判定は続ける */ }
+  }
+
+  function load(){
+    var raw;
+    try { raw = localStorage.getItem(STORE_KEY); } catch(e){ return; }
+    if (!raw) return;
+    var d;
+    try { d = JSON.parse(raw); } catch(e){ return; }
+    if (!d || typeof d !== "object") return;
+    FIELDS.forEach(function(id){
+      var v = d[id];
+      if (v === null || v === undefined || v === "") return;
+      var el = $(id);
+      if (el.tagName === "SELECT"){
+        if ([].some.call(el.options, function(o){ return o.value === String(v); })) el.value = v;
+      } else if (isFinite(parseFloat(v))){
+        el.value = v;
+      }
+    });
+  }
+
+  FIELDS.forEach(function(id){
+    $(id).addEventListener("input", render);
+    $(id).addEventListener("change", render);
+  });
+
+  load();
+  render();
+
+})();
+</script>
+</body>
+</html>
