@@ -198,6 +198,47 @@
   .more a:focus-visible{outline:2px solid var(--indigo);outline-offset:2px}
   .more .t{font-size:14px;font-weight:700;margin:0 0 2px}
   .more .d{font-size:12.5px;color:var(--muted);margin:0}
+
+  /* ---------- japanese-typography：日本語の組版と地の色 ---------- */
+  body{
+    /* palt = 約物（、。（）など）のアキを詰める。日本語の見え方が一番変わる指定 */
+    font-feature-settings:"palt" 1;
+    letter-spacing:.012em;
+    line-height:1.78;
+    line-break:strict;
+    word-break:normal;
+    overflow-wrap:break-word;
+    background-color:var(--paper);
+    background-image:
+      radial-gradient(88% 36% at 50% -8%, #ffffff 0%, rgba(255,255,255,0) 64%),
+      linear-gradient(180deg, #f5f8fc 0%, rgba(245,248,252,0) 540px);
+    background-repeat:no-repeat;
+    background-attachment:scroll;
+  }
+  /* 等幅・入力欄は詰めない（数字の桁ぞろえを崩さないため） */
+  input,select,button,.sitenav .brand{font-feature-settings:normal}
+  input,select,button{letter-spacing:0}
+  ::selection{background:rgba(61,74,122,.16)}
+
+  a{text-underline-offset:.18em;text-decoration-thickness:from-font}
+  a:focus-visible{outline:2px solid var(--indigo);outline-offset:2px;border-radius:3px}
+
+  /* 面をわずかに浮かせて、白地と背景の境目をはっきりさせる */
+  .card,.tool,.about{
+    box-shadow:0 1px 2px rgba(20,22,31,.04), 0 10px 26px -20px rgba(20,22,31,.22);
+  }
+
+  h1{letter-spacing:-.012em}
+  h2,h3{letter-spacing:.005em}
+  .lede{font-size:15.5px;line-height:1.9}
+
+  /* 本文の可読性：13.5px は小さいので 14px + 行間広め */
+  .notes p,.notes li{font-size:14px;line-height:1.9}
+  .notes h3{font-size:14px;margin-top:22px}
+  .notes ul{padding-left:1.35em}
+  .src{font-size:13px;line-height:1.85}
+  .check .desc,.step p,.box p,.soudan p,.more .d{font-size:13.5px;line-height:1.85}
+  .headline .sub{font-size:14px;line-height:1.85}
 </style>
 </head>
 <body>
@@ -313,7 +354,7 @@
     <p class="src">給与所得控除・基礎控除・扶養親族の所得要件 — <a href="https://www.nta.go.jp/users/gensen/2025kiso/index.htm" target="_blank" rel="noopener">国税庁「令和7年度税制改正による所得税の基礎控除の見直し等について」</a></p>
     <p class="src">特定親族特別控除の控除額 — <a href="https://www.nta.go.jp/taxes/shiraberu/taxanswer/shotoku/1177.htm" target="_blank" rel="noopener">国税庁 タックスアンサー「No.1177 特定親族特別控除」</a></p>
     <p class="src">健康保険の被扶養者の年間収入要件 — <a href="https://www.nenkin.go.jp/oshirase/taisetu/2025/202508/0819.html" target="_blank" rel="noopener">日本年金機構「19歳以上23歳未満の方の被扶養者認定における年間収入要件が変わります」</a></p>
-    <p class="src" style="margin-top:14px">給料そのものの計算は <a href="/kyuryo/">バイト給料計算機</a> をどうぞ。深夜手当・残業手当こみで次の支給額が出ます。</p>
+    <p class="src" style="margin-top:14px">給料そのものの計算は<a href="/kyuryo/">バイト給料計算機</a>をどうぞ。深夜手当・残業手当こみで次の支給額が出ます。</p>
   </section>
 
   <section class="card notes">
@@ -439,9 +480,9 @@
           : '<p class="big">' + yen(left) + '<small>円</small></p>') +
         (over
           ? '<p class="sub">すでに壁を越えています。下の「超えたらどうなるか」を確認してください。</p>'
-          : '<p class="sub">今年はあと <b>' + yen(left) + '円</b> 働けます。' +
+          : '<p class="sub">今年はあと <b>' + yen(left) + '円</b>働けます。' +
             (hours !== null && wage > 0
-              ? '時給' + yen(wage) + '円なら <b>あと' + yen(hours) + '時間</b>。' +
+              ? '時給' + yen(wage) + '円なら<b>あと' + yen(hours) + '時間</b>。' +
                 '<a href="/kyuryo/">給料の計算はこちら</a>'
               : '') +
             '</p>') +
@@ -483,17 +524,17 @@
       parentHtml = '<p>16歳未満は扶養控除の対象外です。年収による親の税負担の変化はありません。</p>';
     } else if (ded === dedFull){
       parentHtml =
-        '<p>いまは親の控除が満額の <span class="num">' + yen(dedFull) + '円</span> です。</p>' +
+        '<p>いまは親の控除が満額の <span class="num">' + yen(dedFull) + '円</span>です。</p>' +
         (isTokutei(age)
           ? '<p><span class="num">150万円</span>を超えると段階的に減り始め、<span class="num">188万円</span>でゼロになります。</p>'
           : '<p><span class="num">123万円</span>を超えると<b>一気にゼロ</b>になります。19〜22歳のような段階的な緩和はありません。</p>');
     } else if (ded > 0){
       parentHtml =
-        '<p>親の控除は <span class="num">' + yen(ded) + '円</span> まで減っています（満額は' + yen(dedFull) + '円）。</p>' +
-        '<p>差額 <span class="num">' + yen(dedFull - ded) + '円</span> に親の税率をかけた分だけ、親の税負担が増えます。</p>';
+        '<p>親の控除は <span class="num">' + yen(ded) + '円</span>まで減っています（満額は' + yen(dedFull) + '円）。</p>' +
+        '<p>差額 <span class="num">' + yen(dedFull - ded) + '円</span>に親の税率をかけた分だけ、親の税負担が増えます。</p>';
     } else {
       parentHtml =
-        '<p>親の控除は <b>ゼロ</b>です。満額だった場合と比べ、<span class="num">' + yen(dedFull) + '円</span>ぶんの控除が失われています。</p>';
+        '<p>親の控除は<b>ゼロ</b>です。満額だった場合と比べ、<span class="num">' + yen(dedFull) + '円</span>ぶんの控除が失われています。</p>';
     }
 
     var selfHtml = "";
@@ -528,7 +569,7 @@
     }
     flags += '<p class="flag">学生かどうかに関わらず、<b>正社員の所定労働時間・日数の4分の3以上</b>働くと、勤務先の社会保険に加入します。シフトを大きく増やす場合は注意してください。</p>';
     flags += '<p class="flag">健康保険の判定は「これから1年間の見込み」で行われます。月額でいうと' +
-             man(hLimit) + '円は月 <b>' + yen(Math.floor(hLimit / 12)) + '円</b> が目安です。</p>';
+             man(hLimit) + '円は月 <b>' + yen(Math.floor(hLimit / 12)) + '円</b>が目安です。</p>';
 
     $("impFlags").innerHTML = flags;
 

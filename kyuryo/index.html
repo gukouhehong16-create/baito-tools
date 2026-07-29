@@ -212,6 +212,47 @@
   .more a:focus-visible{outline:2px solid var(--indigo);outline-offset:2px}
   .more .t{font-size:14px;font-weight:700;margin:0 0 2px}
   .more .d{font-size:12.5px;color:var(--muted);margin:0}
+
+  /* ---------- japanese-typography：日本語の組版と地の色 ---------- */
+  body{
+    /* palt = 約物（、。（）など）のアキを詰める。日本語の見え方が一番変わる指定 */
+    font-feature-settings:"palt" 1;
+    letter-spacing:.012em;
+    line-height:1.78;
+    line-break:strict;
+    word-break:normal;
+    overflow-wrap:break-word;
+    background-color:var(--paper);
+    background-image:
+      radial-gradient(88% 36% at 50% -8%, #ffffff 0%, rgba(255,255,255,0) 64%),
+      linear-gradient(180deg, #f5f8fc 0%, rgba(245,248,252,0) 540px);
+    background-repeat:no-repeat;
+    background-attachment:scroll;
+  }
+  /* 等幅・入力欄は詰めない（数字の桁ぞろえを崩さないため） */
+  input,select,button,.sitenav .brand{font-feature-settings:normal}
+  input,select,button{letter-spacing:0}
+  ::selection{background:rgba(61,74,122,.16)}
+
+  a{text-underline-offset:.18em;text-decoration-thickness:from-font}
+  a:focus-visible{outline:2px solid var(--indigo);outline-offset:2px;border-radius:3px}
+
+  /* 面をわずかに浮かせて、白地と背景の境目をはっきりさせる */
+  .card,.tool,.about{
+    box-shadow:0 1px 2px rgba(20,22,31,.04), 0 10px 26px -20px rgba(20,22,31,.22);
+  }
+
+  h1{letter-spacing:-.012em}
+  h2,h3{letter-spacing:.005em}
+  .lede{font-size:15.5px;line-height:1.9}
+
+  /* 本文の可読性：13.5px は小さいので 14px + 行間広め */
+  .notes p,.notes li{font-size:14px;line-height:1.9}
+  .notes h3{font-size:14px;margin-top:22px}
+  .notes ul{padding-left:1.35em}
+  .src{font-size:13px;line-height:1.85}
+  .check .desc,.step p,.box p,.soudan p,.more .d{font-size:13.5px;line-height:1.85}
+  .headline .sub{font-size:14px;line-height:1.85}
 </style>
 </head>
 <body>

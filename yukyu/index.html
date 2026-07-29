@@ -167,6 +167,47 @@
   .more a:focus-visible{outline:2px solid var(--indigo);outline-offset:2px}
   .more .t{font-size:14px;font-weight:700;margin:0 0 2px}
   .more .d{font-size:12.5px;color:var(--muted);margin:0}
+
+  /* ---------- japanese-typography：日本語の組版と地の色 ---------- */
+  body{
+    /* palt = 約物（、。（）など）のアキを詰める。日本語の見え方が一番変わる指定 */
+    font-feature-settings:"palt" 1;
+    letter-spacing:.012em;
+    line-height:1.78;
+    line-break:strict;
+    word-break:normal;
+    overflow-wrap:break-word;
+    background-color:var(--paper);
+    background-image:
+      radial-gradient(88% 36% at 50% -8%, #ffffff 0%, rgba(255,255,255,0) 64%),
+      linear-gradient(180deg, #f5f8fc 0%, rgba(245,248,252,0) 540px);
+    background-repeat:no-repeat;
+    background-attachment:scroll;
+  }
+  /* 等幅・入力欄は詰めない（数字の桁ぞろえを崩さないため） */
+  input,select,button,.sitenav .brand{font-feature-settings:normal}
+  input,select,button{letter-spacing:0}
+  ::selection{background:rgba(61,74,122,.16)}
+
+  a{text-underline-offset:.18em;text-decoration-thickness:from-font}
+  a:focus-visible{outline:2px solid var(--indigo);outline-offset:2px;border-radius:3px}
+
+  /* 面をわずかに浮かせて、白地と背景の境目をはっきりさせる */
+  .card,.tool,.about{
+    box-shadow:0 1px 2px rgba(20,22,31,.04), 0 10px 26px -20px rgba(20,22,31,.22);
+  }
+
+  h1{letter-spacing:-.012em}
+  h2,h3{letter-spacing:.005em}
+  .lede{font-size:15.5px;line-height:1.9}
+
+  /* 本文の可読性：13.5px は小さいので 14px + 行間広め */
+  .notes p,.notes li{font-size:14px;line-height:1.9}
+  .notes h3{font-size:14px;margin-top:22px}
+  .notes ul{padding-left:1.35em}
+  .src{font-size:13px;line-height:1.85}
+  .check .desc,.step p,.box p,.soudan p,.more .d{font-size:13.5px;line-height:1.85}
+  .headline .sub{font-size:14px;line-height:1.85}
 </style>
 </head>
 <body>
@@ -258,7 +299,7 @@
     <h2>出典</h2>
     <p class="src">年次有給休暇の付与日数 — <a href="https://laws.e-gov.go.jp/law/322AC0000000049" target="_blank" rel="noopener">労働基準法 第39条</a></p>
     <p class="src">比例付与の日数表 — <a href="https://laws.e-gov.go.jp/law/322M40000100023" target="_blank" rel="noopener">労働基準法施行規則 第24条の3</a></p>
-    <p class="src" style="margin-top:14px">有給を取った日の給料は <a href="/kyuryo/">バイト給料計算機</a> で計算できます。「その日に働く予定だった時間 × 時給」で支払われるのが一般的なので、シフトの時間を入れればそのまま金額が出ます。</p>
+    <p class="src" style="margin-top:14px">有給を取った日の給料は<a href="/kyuryo/">バイト給料計算機</a>で計算できます。「その日に働く予定だった時間 × 時給」で支払われるのが一般的なので、シフトの時間を入れればそのまま金額が出ます。</p>
   </section>
 
   <section class="card notes">
@@ -412,7 +453,7 @@
       var nextDays = table[tier];
       nextHtml = '<p class="sub"><b>' + nx.y + '年' + nx.m + '月</b>ごろ（勤続' +
                  (TIERS[tier] / 12 === Math.floor(TIERS[tier] / 12) ? (TIERS[tier] / 12) + '年' : (Math.floor(TIERS[tier] / 12)) + '年6か月') +
-                 '）に <b>' + nextDays + '日</b> へ増えます。</p>';
+                 '）に <b>' + nextDays + '日</b>へ増えます。</p>';
     } else {
       nextHtml = '<p class="sub">勤続6年6か月で上限に達しています。これ以上は増えません。</p>';
     }

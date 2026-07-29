@@ -143,6 +143,47 @@
   .more a:focus-visible{outline:2px solid var(--indigo);outline-offset:2px}
   .more .t{font-size:14px;font-weight:700;margin:0 0 2px}
   .more .d{font-size:12.5px;color:var(--muted);margin:0}
+
+  /* ---------- japanese-typography：日本語の組版と地の色 ---------- */
+  body{
+    /* palt = 約物（、。（）など）のアキを詰める。日本語の見え方が一番変わる指定 */
+    font-feature-settings:"palt" 1;
+    letter-spacing:.012em;
+    line-height:1.78;
+    line-break:strict;
+    word-break:normal;
+    overflow-wrap:break-word;
+    background-color:var(--paper);
+    background-image:
+      radial-gradient(88% 36% at 50% -8%, #ffffff 0%, rgba(255,255,255,0) 64%),
+      linear-gradient(180deg, #f5f8fc 0%, rgba(245,248,252,0) 540px);
+    background-repeat:no-repeat;
+    background-attachment:scroll;
+  }
+  /* 等幅・入力欄は詰めない（数字の桁ぞろえを崩さないため） */
+  input,select,button,.sitenav .brand{font-feature-settings:normal}
+  input,select,button{letter-spacing:0}
+  ::selection{background:rgba(61,74,122,.16)}
+
+  a{text-underline-offset:.18em;text-decoration-thickness:from-font}
+  a:focus-visible{outline:2px solid var(--indigo);outline-offset:2px;border-radius:3px}
+
+  /* 面をわずかに浮かせて、白地と背景の境目をはっきりさせる */
+  .card,.tool,.about{
+    box-shadow:0 1px 2px rgba(20,22,31,.04), 0 10px 26px -20px rgba(20,22,31,.22);
+  }
+
+  h1{letter-spacing:-.012em}
+  h2,h3{letter-spacing:.005em}
+  .lede{font-size:15.5px;line-height:1.9}
+
+  /* 本文の可読性：13.5px は小さいので 14px + 行間広め */
+  .notes p,.notes li{font-size:14px;line-height:1.9}
+  .notes h3{font-size:14px;margin-top:22px}
+  .notes ul{padding-left:1.35em}
+  .src{font-size:13px;line-height:1.85}
+  .check .desc,.step p,.box p,.soudan p,.more .d{font-size:13.5px;line-height:1.85}
+  .headline .sub{font-size:14px;line-height:1.85}
 </style>
 </head>
 <body>
@@ -203,9 +244,9 @@
   <section class="card notes">
     <h2>知っておくこと</h2>
     <p class="asof">最終確認日：2026年7月29日</p>
-    <p><b>源泉徴収票がないと手続きできません。</b> 辞めたバイト先にも請求できます。交付は法律上の義務なので、断られる筋合いのものではありません。</p>
+    <p><b>源泉徴収票がないと手続きできません。</b>辞めたバイト先にも請求できます。交付は法律上の義務なので、断られる筋合いのものではありません。</p>
     <p>還付申告は<span class="num">5年前</span>までさかのぼれます。去年・一昨年に引かれた分も、まだ戻せる可能性があります。</p>
-    <p><b>住民税は別の話です。</b> 所得税が全額戻っても、住民税がかかることはあります。住民税の非課税ラインは自治体により異なります。</p>
+    <p><b>住民税は別の話です。</b>所得税が全額戻っても、住民税がかかることはあります。住民税の非課税ラインは自治体により異なります。</p>
     <p>このツールが出す金額は概算です。正確な額は年末調整または確定申告で確定します。</p>
   </section>
 
@@ -216,7 +257,7 @@
     <p>毎月の源泉徴収は<b>「仮の金額」</b>だからです。1年の収入が確定してから精算する仕組みになっていて、その精算が年末調整や確定申告です。1年を通して見れば税金がかからない収入でも、月によって多く稼いだ月があれば、その月は引かれます。</p>
 
     <h3>88,000円の壁って聞いたけど？</h3>
-    <p><b>その数字はもう古いです。</b> 令和8年1月から、源泉徴収税額表で税額がゼロになる上限が<span class="num">月額88,000円</span>から<span class="num">月額105,000円</span>に引き上げられました。月10万円くらいまでなら、そもそも引かれません。ネット上の記事の多くは古い数字のままなので注意してください。</p>
+    <p><b>その数字はもう古いです。</b>令和8年1月から、源泉徴収税額表で税額がゼロになる上限が<span class="num">月額88,000円</span>から<span class="num">月額105,000円</span>に引き上げられました。月10万円くらいまでなら、そもそも引かれません。ネット上の記事の多くは古い数字のままなので注意してください。</p>
 
     <h3>掛け持ちしていると何が違う？</h3>
     <p>2か所目は<span class="num">乙欄</span>という区分で計算され、<b>月額105,000円未満でも給与額の<span class="num">3.063%</span>が引かれます</b>。「給与所得者の扶養控除等（異動）申告書」は1か所にしか出せないため、出していないほうが自動的に乙欄になる仕組みです。</p>
@@ -226,7 +267,7 @@
     <p>還付だけなら難しくありません。<b>源泉徴収票の数字を入力するだけ</b>です。e-Tax ならスマホで完結し、税務署に行く必要もありません。所要時間は30分ほどです。</p>
 
     <h3>親の扶養から外れる？</h3>
-    <p>還付を受けること自体は扶養に影響しません。影響するのは<b>年収の額</b>です。いくらまで働けるかは <a href="/nenshu-kabe/">年収の壁 判定ツール</a> で確認できます。19〜22歳の学生なら150万円が実質の壁になります。</p>
+    <p>還付を受けること自体は扶養に影響しません。影響するのは<b>年収の額</b>です。いくらまで働けるかは<a href="/nenshu-kabe/">年収の壁 判定ツール</a>で確認できます。19〜22歳の学生なら150万円が実質の壁になります。</p>
 
     <p class="caution">ここに書いた内容は一般的な制度の説明です。実際の還付額は他の控除や収入の状況によって変わります。判断に迷う場合は、勤務先または税務署に確認してください。</p>
   </section>
@@ -235,7 +276,7 @@
     <h2>出典</h2>
     <p class="src">月額105,000円未満で源泉徴収税額がゼロ（甲欄・扶養親族等0人） — <a href="https://www.nta.go.jp/publication/pamph/gensen/zeigakuhyo2026/01.htm" target="_blank" rel="noopener">国税庁「令和8年分 源泉徴収税額表」</a></p>
     <p class="src">給与所得控除65万円・基礎控除95万円 — <a href="https://www.nta.go.jp/users/gensen/2025kiso/index.htm" target="_blank" rel="noopener">国税庁「令和7年度税制改正による所得税の基礎控除の見直し等について」</a></p>
-    <p class="src" style="margin-top:14px">給料そのものの計算は <a href="/kyuryo/">バイト給料計算機</a> をどうぞ。深夜手当・残業手当こみで支給額が出ます。</p>
+    <p class="src" style="margin-top:14px">給料そのものの計算は<a href="/kyuryo/">バイト給料計算機</a>をどうぞ。深夜手当・残業手当こみで支給額が出ます。</p>
   </section>
 
   <section class="card notes">
