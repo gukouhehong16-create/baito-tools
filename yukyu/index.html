@@ -132,10 +132,57 @@
   .src a{color:var(--indigo)}
   footer{text-align:center;font-size:12px;color:var(--muted);padding-top:26px}
   footer a{color:var(--indigo)}
+
+  /* ---------- site nav ---------- */
+  .sitenav{
+    display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;
+    padding:16px 0 0;
+  }
+  .sitenav .brand{
+    font-size:13.5px;font-weight:700;color:var(--ink);
+    text-decoration:none;letter-spacing:-.01em;white-space:nowrap;
+  }
+  .sitenav .brand:hover{color:var(--indigo)}
+  .sitenav .links{display:flex;gap:13px;flex-wrap:wrap;margin-left:auto}
+  .sitenav .links a{
+    font-size:12.5px;color:var(--muted);text-decoration:none;
+    padding-bottom:2px;border-bottom:1.5px solid transparent;white-space:nowrap;
+  }
+  .sitenav .links a:hover{color:var(--indigo);border-bottom-color:var(--line)}
+  .sitenav .links a[aria-current]{color:var(--ink);font-weight:600;border-bottom-color:var(--amber)}
+  .sitenav .links a:focus-visible{outline:2px solid var(--indigo);outline-offset:3px}
+  @media(max-width:560px){
+    .sitenav{gap:8px}
+    .sitenav .links{margin-left:0;width:100%;gap:12px}
+  }
+
+  /* ---------- other tools ---------- */
+  .more{display:grid;gap:9px}
+  .more a{
+    display:block;text-decoration:none;color:inherit;
+    border:1px solid var(--line);border-radius:10px;padding:12px 14px;
+    transition:border-color .15s;
+  }
+  .more a:hover{border-color:var(--indigo)}
+  .more a:focus-visible{outline:2px solid var(--indigo);outline-offset:2px}
+  .more .t{font-size:14px;font-weight:700;margin:0 0 2px}
+  .more .d{font-size:12.5px;color:var(--muted);margin:0}
 </style>
 </head>
 <body>
 <div class="wrap">
+
+  <nav class="sitenav" aria-label="ツール一覧">
+    <a class="brand" href="/">バイトの計算ツール</a>
+    <div class="links">
+      <a href="/kyuryo/">給料</a>
+      <a href="/roudou-jikan/">シフト適法</a>
+      <a href="/kanpu/">税の還付</a>
+      <a href="/nenshu-kabe/">年収の壁</a>
+      <a href="/yukyu/" aria-current="page">有給</a>
+    </div>
+  </nav>
+
 
   <header>
     <p class="eyebrow">労働基準法 第39条</p>
@@ -209,9 +256,19 @@
 
   <section class="card notes">
     <h2>出典</h2>
-    <p class="src">年次有給休暇の付与日数 — <a href="">労働基準法 第39条</a></p>
-    <p class="src">比例付与の日数表 — <a href="">労働基準法施行規則 第24条の3</a></p>
+    <p class="src">年次有給休暇の付与日数 — <a href="https://laws.e-gov.go.jp/law/322AC0000000049" target="_blank" rel="noopener">労働基準法 第39条</a></p>
+    <p class="src">比例付与の日数表 — <a href="https://laws.e-gov.go.jp/law/322M40000100023" target="_blank" rel="noopener">労働基準法施行規則 第24条の3</a></p>
     <p class="src" style="margin-top:14px">有給を取った日の給料は <a href="/kyuryo/">バイト給料計算機</a> で計算できます。「その日に働く予定だった時間 × 時給」で支払われるのが一般的なので、シフトの時間を入れればそのまま金額が出ます。</p>
+  </section>
+
+  <section class="card notes">
+    <h2>ほかのツール</h2>
+    <div class="more">
+      <a href="/kyuryo/"><p class="t">バイト給料計算機</p><p class="d">深夜手当・残業手当こみで支給額を計算</p></a>
+      <a href="/roudou-jikan/"><p class="t">シフト適法チェック</p><p class="d">その働き方が労働基準法に違反していないか</p></a>
+      <a href="/kanpu/"><p class="t">引かれた所得税は戻る？</p><p class="d">源泉徴収された税が戻るかを判定</p></a>
+      <a href="/nenshu-kabe/"><p class="t">年収の壁 判定ツール</p><p class="d">扶養を外れないラインと、あと働ける額</p></a>
+    </div>
   </section>
 
   <footer>
