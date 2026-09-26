@@ -16,6 +16,9 @@
  *   価格アラート・大きな値動き・52週高値/安値・格上げ/格下げ・目標株価の変化・決算の前日・EPS予想の修正 をメールで知らせます。
  *   米国市場の取引時間中は15分ごとにも見張ります。
  *
+ * そのほか毎朝: テクニカルのシグナル（ゴールデンクロス・52週高値・RSI・出来高急増など）、空売り・インサイダー売買・機関投資家の保有、
+ *   スコアの記録（スコア・株価・目標株価・推奨を毎日積み上げる）、モデルポートフォリオ（スコア上位20社を毎週入れ替え）を更新します。
+ *
  * 止めたいとき: 関数「stop」を実行します。再開は「setup」をもう一度実行します。
  */
 
@@ -123,6 +126,7 @@ function tick() {
     } catch (e) {
       log.push([JOBS[mode], 'error', '更新できず: ' + msg_(e)]);
     }
+    try { post_(st, mode); st.postErr = null; } catch (e) { st.postErr = msg_(e); }
     finish_(st, mode, log);
     queue.shift();
     P.set('QUEUE', queue);
@@ -581,8 +585,11 @@ function runQuotes_(st, tickers, q, log, deadline, t0) {
   econ.fng = econ.fng || oldEcon.fng || null;
   if (!econ.fat) econ.fat = oldEcon.fat || null;
   put_(st, 'meta/econ', econ);
+  // テクニカルのシグナル（全銘柄）
+  let sig = null;
+  try { sig = signals_(res); put_(st, 'meta/signals', sig); } catch (e) { diag.signals = msg_(e); }
   // ウォッチリストの見張り（終値ベース）と、取引時間中の見張りに使う52週高値・安値
-  try { alertsQuotes_(st, res); } catch (e) { st.mailErr = '通知の判定に失敗: ' + msg_(e); }
+  try { alertsQuotes_(st, res, sig); } catch (e) { st.mailErr = '通知の判定に失敗: ' + msg_(e); }
   const sec = Math.round((Date.now() - t0) / 1000), ne = Object.keys(err).length, dk = Object.keys(diag);
   const note = '一斉更新: 株価' + n + '社（' + asof + (live ? '・取引中の値を含む' : '') + '）、チャート日足1年分' + Object.keys(rows).length + '社、'
     + 'マーケット指標' + Object.keys(mac).length + '種、ニュース' + Object.keys(nw).length + '社、経済データ' + Object.keys(econ.fred).length + '系列'
@@ -755,15 +762,16 @@ function runAnalyst_(st, tickers, cr, log, deadline, t0) {
   const now = jst_();
   // 1社につき1回の問い合わせで、推奨・目標株価・格付け変更と、決算日・EPS予想の推移・過去の決算サプライズをまとめて取る
   const raw = cr ? many_(tickers.map(t => Y + '/v10/finance/quoteSummary/' + ysym_(t)
-    + '?modules=financialData,recommendationTrend,upgradeDowngradeHistory,calendarEvents,earningsTrend,earningsHistory&crumb=' + encodeURIComponent(cr.crumb)),
+    + '?modules=financialData,recommendationTrend,upgradeDowngradeHistory,calendarEvents,earningsTrend,earningsHistory,defaultKeyStatistics,netSharePurchaseActivity,insiderTransactions,majorHoldersBreakdown&crumb=' + encodeURIComponent(cr.crumb)),
   cr.headers, deadline, 20) : null;
-  const sum = [], earn = {};
+  const sum = [], earn = {}, own = {};
   tickers.forEach((t, i) => {
     if (!raw) { sum.push(null); return; }
     let j;
     try { j = json_(raw[i]); } catch (e) { sum.push({ err: msg_(e) }); return; }
     try { sum.push({ v: parseAnalyst_(j) }); } catch (e) { sum.push({ err: msg_(e) }); }
     try { const e = parseEarn_(j); if (e) earn[t] = e; } catch (e) { /* 決算データなし */ }
+    try { const o = parseOwn_(j); if (o) own[t] = o; } catch (e) { /* 需給データなし */ }
   });
   const ins = mapFetch_(tickers.map(t => Y + '/ws/insights/v2/finance/insights?symbol=' + ysym_(t) + '&lang=en-US&region=US'), parseInsights_, HD, deadline, 20);
   const rows = {}, err = {};
@@ -802,7 +810,15 @@ function runAnalyst_(st, tickers, cr, log, deadline, t0) {
     put_(st, 'meta/cal', cal);
     calNote = '、決算と予想修正 ' + nE + '社・今後2週間の決算 ' + cal.earn.length + '件・経済指標 ' + cal.econ.length + '件';
   }
-  try { alertsAnalyst_(st, prev, all, allE); } catch (e) { st.mailErr = '通知の判定に失敗: ' + msg_(e); }
+  // 空売り・インサイダー売買・機関投資家の保有
+  const nO = Object.keys(own).length;
+  if (nO >= tickers.length * 0.3) {
+    const prevO = (get_(st, 'meta/own') || {}).rows || {}, keepO = {};
+    tickers.forEach(t => { if (!own[t] && prevO[t]) keepO[t] = prevO[t]; });
+    put_(st, 'meta/own', { at: now.at, src: 'Yahoo Finance', cols: OCOLS, rows: Object.assign(keepO, own) });
+    calNote += '、需給 ' + nO + '社';
+  }
+  try { alertsAnalyst_(st, prev, all, allE, own); } catch (e) { st.mailErr = '通知の判定に失敗: ' + msg_(e); }
   log.push(['analyst', ne ? 'partial' : 'ok', 'アナリスト評価 ' + n + '社（' + src + '、Google Apps Script、' + Math.round((Date.now() - t0) / 1000) + '秒）'
     + (ne ? '、取得できず ' + ne + '社' : '') + (cr ? '' : '、コンセンサスは取得できず') + calNote]);
 }
@@ -892,9 +908,252 @@ function econEvents_(cr) {
 }
 
 
+// ========== テクニカルのシグナル ==========
+
+const SIGS = { gc: 'ゴールデンクロス', dc: 'デッドクロス', h52: '52週高値', l52: '52週安値', ob: 'RSI 70超', os: 'RSI 30割れ', vs: '出来高急増', mu: '200日線を上抜け', md: '200日線を下抜け' };
+
+function sigText_(x) {
+  const k = x[1], a = x[2], b = x[3];
+  return ({
+    gc: 'ゴールデンクロス：50日線（' + usd_(a) + '）が200日線（' + usd_(b) + '）を上抜け',
+    dc: 'デッドクロス：50日線（' + usd_(a) + '）が200日線（' + usd_(b) + '）を下抜け',
+    h52: '終値で52週高値を更新（' + usd_(a) + '）', l52: '終値で52週安値を更新（' + usd_(a) + '）',
+    ob: 'RSI が ' + (a || 0).toFixed(0) + ' まで上昇（70超は買われすぎの目安）', os: 'RSI が ' + (a || 0).toFixed(0) + ' まで低下（30割れは売られすぎの目安）',
+    vs: '出来高が50日平均の ' + (a || 0).toFixed(1) + '倍（値動き ' + pct_(b || 0) + '）',
+    mu: '終値（' + usd_(a) + '）が200日線（' + usd_(b) + '）を上抜け', md: '終値（' + usd_(a) + '）が200日線（' + usd_(b) + '）を下抜け',
+  })[k] || k;
+}
+
+/** 日足から、最新の取引日に出たシグナルを全銘柄について拾う */
+function signals_(res) {
+  const items = [];
+  let day = '';
+  Object.keys(res).forEach(t => {
+    const b = res[t].bars, ds = Object.keys(b).sort(), n = ds.length;
+    if (n < 60) return;
+    const c = ds.map(d => b[d][3]), v = ds.map(d => b[d][4]);
+    if (ds[n - 1] > day) day = ds[n - 1];
+    const ma = (k, end) => { if (end < k) return null; let x = 0; for (let i = end - k; i < end; i++) x += c[i]; return x / k; };
+    const push = (k, a, b2) => items.push([t, k, a == null ? null : rnd_(a, 4), b2 == null ? null : rnd_(b2, 4)]);
+    if (n >= 203) {
+      for (let k = 0; k < 3; k++) { // 直近3日以内に50日線が200日線を上抜け・下抜け
+        const e = n - k, a1 = ma(50, e), b1 = ma(200, e), a0 = ma(50, e - 1), b0 = ma(200, e - 1);
+        if (a0 <= b0 && a1 > b1) { push('gc', a1, b1); break; }
+        if (a0 >= b0 && a1 < b1) { push('dc', a1, b1); break; }
+      }
+      const m1 = ma(200, n), m0 = ma(200, n - 1);
+      if (c[n - 2] <= m0 && c[n - 1] > m1) push('mu', c[n - 1], m1);
+      if (c[n - 2] >= m0 && c[n - 1] < m1) push('md', c[n - 1], m1);
+    }
+    if (n >= 200) {
+      const past = c.slice(Math.max(0, n - 253), n - 1), hi = Math.max.apply(null, past), lo = Math.min.apply(null, past);
+      if (c[n - 1] > hi) push('h52', c[n - 1], hi);
+      if (c[n - 1] < lo) push('l52', c[n - 1], lo);
+    }
+    const r1 = rsi_(c, n), r0 = rsi_(c, n - 1);
+    if (r1 != null && r0 != null) {
+      if (r0 <= 70 && r1 > 70) push('ob', r1, null);
+      if (r0 >= 30 && r1 < 30) push('os', r1, null);
+    }
+    if (n >= 52) {
+      let x = 0;
+      for (let i = n - 51; i < n - 1; i++) x += v[i] || 0;
+      const av = x / 50, ch = c[n - 1] / c[n - 2] - 1;
+      if (av > 0 && v[n - 1] >= 2.5 * av && Math.abs(ch) >= 0.03) push('vs', v[n - 1] / av, ch);
+    }
+  });
+  return { at: jst_().at, day: day, items: items };
+}
+
+/** Wilder の RSI(14)。c[0]〜c[end-1] の終値で計算する */
+function rsi_(c, end) {
+  const N = 14;
+  if (end < N * 3) return null;
+  let g = 0, l = 0;
+  for (let i = 1; i <= N; i++) { const d = c[i] - c[i - 1]; if (d > 0) g += d; else l -= d; }
+  g /= N; l /= N;
+  for (let i = N + 1; i < end; i++) { const d = c[i] - c[i - 1]; g = (g * (N - 1) + Math.max(d, 0)) / N; l = (l * (N - 1) + Math.max(-d, 0)) / N; }
+  return l === 0 ? 100 : 100 - 100 / (1 + g / l);
+}
+
+
+// ========== 空売り・インサイダー売買・機関投資家の保有 ==========
+
+// 列: 空売り比率（浮動株比）・空売りの買い戻し日数・空売り残の前月比・空売りの基準日・インサイダー保有比率・機関投資家の保有比率・機関投資家の数・
+// 6か月のインサイダー純売買（保有株比）・90日の市場での買い [件数, 金額]・売り [件数, 金額]・直近の市場での売買3件 [日付, 氏名, 役職, P/S, 株数, 金額]
+const OCOLS = ['spf', 'sr', 'sch', 'dsi', 'ins', 'inst', 'instN', 'net6', 'buy', 'sell', 'tx'];
+
+function parseOwn_(j) {
+  const r = ((j.quoteSummary || {}).result || [null])[0];
+  if (!r) return null;
+  const k = r.defaultKeyStatistics || {}, h = r.majorHoldersBreakdown || {}, np = r.netSharePurchaseActivity || {};
+  const sh = num_(k.sharesShort), sp = num_(k.sharesShortPriorMonth), cut = Date.now() / 1000 - 90 * 86400;
+  const tx = ((r.insiderTransactions || {}).transactions || []).map(x => {
+    const txt = String((x && x.transactionText) || ''), kind = /^Purchase/i.test(txt) ? 'P' : /^Sale/i.test(txt) ? 'S' : '';
+    return kind ? [num_(x.startDate) || 0, String(x.filerName || '').slice(0, 24), String(x.filerRelation || '').slice(0, 22), kind, num_(x.shares), num_(x.value)] : null;
+  }).filter(Boolean).sort((a, b) => b[0] - a[0]);
+  const recent = tx.filter(x => x[0] >= cut);
+  const tot = kind => { const l = recent.filter(x => x[3] === kind); return l.length ? [l.length, Math.round(l.reduce((a, x) => a + (x[5] || 0), 0))] : null; };
+  const dsi = k.dateShortInterest && typeof k.dateShortInterest.raw === 'number' ? ymd_(k.dateShortInterest.raw) : '';
+  const row = [num_(k.shortPercentOfFloat), num_(k.shortRatio), sh && sp ? rnd_(sh / sp - 1, 4) : null, dsi,
+    num_(h.insidersPercentHeld), num_(h.institutionsPercentHeld), num_(h.institutionsCount), num_(np.netPercentInsiderShares),
+    tot('P'), tot('S'), tx.slice(0, 3).map(x => [ymd_(x[0]), x[1], x[2], x[3], x[4], x[5]])];
+  if ([0, 1, 4, 5, 6, 7].every(i => row[i] == null) && !tx.length) return null;
+  return row;
+}
+
+
+// ========== スコア（ページと同じ計算）・毎日の記録・モデルポートフォリオ ==========
+
+const FACT = [['バリュー', [['ps', -1, true, true], ['pe', -1, true], ['peg', -1, true], ['ev', -1, true]]], ['クオリティ', [['roe', 1], ['opm', 1], ['pm', 1]]],
+  ['成長', [['rg', 1], ['eg', 1]]], ['モメンタム', [['ytd', 1], ['trend', 1], ['range', 1]]], ['予想修正', [['r30', 1], ['r90', 1], ['rud', 1], ['sur', 1]]]];
+const PF_N = 20;
+
+/** ページが置いた銘柄とセクターの一覧（スコアのセクター内比較に使う） */
+function universe_() {
+  const it = DriveApp.searchFiles("title contains 'alpha-lab-universe' and trashed = false"), fs = [];
+  while (it.hasNext()) fs.push(it.next());
+  if (!fs.length) return null;
+  fs.sort((x, y) => y.getDateCreated().getTime() - x.getDateCreated().getTime());
+  fs.slice(1).forEach(f => { try { f.setTrashed(true); } catch (e) { /* 次回 */ } });
+  try { const u = JSON.parse(fs[0].getBlob().getDataAsString('UTF-8')); return u && u.sec ? u.sec : null; } catch (e) { return null; }
+}
+
+/** 銘柄ごとの [Alpha Score, バリュー, クオリティ, 成長, モメンタム, 予想修正]（0〜100） */
+function scores_(q, f, a, e, sec) {
+  const tickers = sec ? Object.keys(sec) : Object.keys(q.rows), fc = (f && f.cols) || [], ec = (e && e.cols) || ECOLS, M = {}; // ページと同じ銘柄の集合で比べる
+  tickers.forEach(t => {
+    const m = {}, r = q.rows[t];
+    if (r) { m.px = r[1]; m.ytd = r[3]; if (r[0] != null && r[2] != null && r[2] > 0) m.ps = r[0] / r[2]; }
+    const qpe = (q.pe || {})[t];
+    if (qpe != null) m.pe = qpe;
+    const fr = f && f.rows && f.rows[t], ar = a && a.rows && a.rows[t], tgt = ar && ar.t && ar.t[0];
+    if (fr || tgt) {
+      const o = {};
+      if (fr) fc.forEach((k, i) => { if (fr[i] != null) o[k] = fr[i]; });
+      ['fpe', 'peg', 'ev', 'roe', 'opm', 'pm', 'rg', 'eg'].forEach(k => { m[k] = o[k]; });
+      if (o.pe != null) m.pe = o.pe;
+      m.trend = o.ma50 && o.ma200 ? o.ma50 / o.ma200 - 1 : null;
+      m.range = o.ma50 != null && o.hi52 && o.lo52 && o.hi52 > o.lo52 ? (o.ma50 - o.lo52) / (o.hi52 - o.lo52) : null;
+      if (m.ps == null && o.ps != null) m.ps = o.ps;
+    }
+    const er = e && e.rows && e.rows[t];
+    if (er) {
+      const E = {};
+      ec.forEach((k, i) => { E[k] = er[i]; });
+      m.r30 = E.r30; m.r90 = E.r90;
+      if (E.u30 != null && E.u30 + (E.d30 || 0) >= 2) m.rud = (E.u30 - (E.d30 || 0)) / (E.u30 + (E.d30 || 0));
+      const sp = (E.sp || []).filter(v => v != null);
+      if (sp.length) m.sur = sp.reduce((x, y) => x + y, 0) / sp.length;
+    }
+    M[t] = m;
+  });
+  const pr = {};
+  const rank = (list, key, dir, pos) => {
+    const arr = list.map(t => [t, M[t][key]]).filter(x => x[1] != null && (!pos || x[1] > 0));
+    arr.sort((x, y) => (x[1] - y[1]) * dir);
+    arr.forEach((x, i) => { (pr[x[0]] = pr[x[0]] || {})[key] = arr.length > 1 ? i / (arr.length - 1) : 0.5; });
+  };
+  FACT.forEach(fa => fa[1].forEach(z => {
+    if (z[3]) {
+      const g = {};
+      tickers.forEach(t => { const s = (sec && sec[t]) || '?'; (g[s] = g[s] || []).push(t); });
+      Object.keys(g).forEach(s => rank(g[s], z[0], z[1], z[2]));
+    } else rank(tickers, z[0], z[1], z[2]);
+  }));
+  const out = {};
+  tickers.forEach(t => {
+    const fv = FACT.map(fa => {
+      const got = fa[1].map(z => (pr[t] || {})[z[0]]).filter(v => v != null);
+      return got.length ? Math.round(got.reduce((x, y) => x + y, 0) / got.length * 100) : null;
+    });
+    const ok = fv.filter(v => v != null);
+    out[t] = [ok.length >= 2 ? Math.round(ok.reduce((x, y) => x + y, 0) / ok.length) : null].concat(fv);
+  });
+  return out;
+}
+
+/** 更新のたびに: スコアを計算し、今日の記録とモデルポートフォリオを更新する */
+function post_(st, mode) {
+  const q = get_(st, 'meta/quotes');
+  if (!q || !q.rows) return;
+  const a = get_(st, 'meta/analyst'), sc = scores_(q, get_(st, 'meta/fund'), a, get_(st, 'meta/earn'), universe_());
+  const day = q.asOf || et_();
+  history_(st, sc, q, a, day);
+  portfolio_(st, sc, q, day, mode);
+}
+
+const histId_ = day => 'hist/' + day.slice(0, 7) + '-' + (Number(day.slice(8, 10)) <= 15 ? '1' : '2');
+
+/** 半月ごとのファイルに、取引日ごとのスコア・株価・平均目標株価・推奨の平均（1＝強い買い〜5＝強い売り）を積み上げる */
+function history_(st, sc, q, a, day) {
+  const id = histId_(day), h = get_(st, id) || { days: [], s: {}, p: {}, t: {}, r: {} }, K = ['s', 'p', 't', 'r'];
+  let i = h.days.indexOf(day);
+  if (i < 0) {
+    h.days.push(day);
+    h.days.sort();
+    i = h.days.indexOf(day);
+    K.forEach(k => Object.keys(h[k]).forEach(T => h[k][T].splice(i, 0, null)));
+  }
+  const n = h.days.length;
+  const put = (k, T, v) => { if (!h[k][T]) { h[k][T] = []; for (let j = 0; j < n; j++) h[k][T].push(null); } h[k][T][i] = v; };
+  Object.keys(sc).forEach(T => {
+    if (sc[T][0] != null) put('s', T, sc[T][0]);
+    const r = q.rows[T];
+    if (r && r[1]) put('p', T, sig_(r[1]));
+    const ar = a && a.rows && a.rows[T];
+    if (ar && ar.t && ar.t[0]) put('t', T, sig_(ar.t[0]));
+    if (ar && ar.m != null) put('r', T, rnd_(ar.m, 2));
+  });
+  h.at = jst_().at;
+  h.m = id.slice(5);
+  put_(st, id, h);
+}
+
+/**
+ * モデルポートフォリオ: Alpha Score 上位20社に等金額で投資し、週に1回（その週の最初のアナリスト評価の更新のあと）入れ替える。
+ * 基準は S&P 500 と、全銘柄の等金額平均。売買手数料と税金は含めない。
+ */
+function portfolio_(st, sc, q, day, mode) {
+  let pf = get_(st, 'meta/pf');
+  const px = T => { const r = q.rows[T]; return r && r[1] > 0 ? r[1] : null; };
+  const mac = get_(st, 'meta/macro'), g = mac && mac.items && mac.items['^GSPC'], spx = g ? (g.p || g.c[g.c.length - 1]) : null;
+  const cur = {};
+  Object.keys(q.rows).forEach(T => { const p = px(T); if (p) cur[T] = p; });
+  if (!pf) {
+    if (mode !== 'analyst' || !Object.keys(sc).some(T => sc[T][0] != null)) return; // 最初の組み入れは、スコアがそろってから
+    pf = { start: day, n: PF_N, cash: 100, h: {}, navs: [], log: [], rb: '', base: { day: '', ew: 100, px: cur }, last: { day: day, ew: 100, px: cur } };
+  }
+  if (pf.last.day !== day) pf.base = pf.last; // 取引日が変わったら、前の取引日の終わりの値を基準にする
+  let ew = pf.base.ew;
+  if (pf.base.day) {
+    const rs = Object.keys(cur).filter(T => pf.base.px[T]).map(T => cur[T] / pf.base.px[T]);
+    if (rs.length) ew = pf.base.ew * rs.reduce((x, y) => x + y, 0) / rs.length;
+  }
+  pf.last = { day: day, ew: ew, px: cur };
+  const val = () => pf.cash + Object.keys(pf.h).reduce((x, T) => x + pf.h[T][0] * (px(T) || pf.h[T][1]), 0);
+  const wk = d => Utilities.formatDate(new Date(Date.parse(d + 'T12:00:00Z')), 'UTC', 'YYYY-ww');
+  if (mode === 'analyst' && (!pf.rb || wk(pf.rb) !== wk(day))) {
+    const nav = val(), old = Object.keys(pf.h), h = {};
+    const top = Object.keys(sc).filter(T => sc[T][0] != null && px(T))
+      .sort((x, y) => sc[y][0] - sc[x][0] || ((q.rows[y][0] || 0) - (q.rows[x][0] || 0))).slice(0, PF_N);
+    top.forEach(T => { h[T] = [nav / top.length / px(T), pf.h[T] ? pf.h[T][1] : px(T), pf.h[T] ? pf.h[T][2] : day]; });
+    pf.log = (pf.log || []).concat([[day, top.filter(T => old.indexOf(T) < 0), old.filter(T => top.indexOf(T) < 0)]]).slice(-30);
+    pf.h = h;
+    pf.cash = 0;
+    pf.rb = day;
+  }
+  const row = [day, rnd_(val(), 4), spx ? sig_(spx) : null, rnd_(ew, 4)], i = pf.navs.map(r => r[0]).indexOf(day);
+  if (i >= 0) pf.navs[i] = row;
+  else pf.navs.push(row);
+  pf.at = jst_().at;
+  put_(st, 'meta/pf', pf);
+}
+
+
 // ========== ウォッチリストのメール通知 ==========
 
-const KIND = { px: '価格アラート', mv: '値動き', hi: '52週高値', lo: '52週安値', rt: '格付け', tp: '目標株価', er: '決算', rv: '予想修正', test: 'テスト' };
+const KIND = { px: '価格アラート', mv: '値動き', hi: '52週高値', lo: '52週安値', rt: '格付け', tp: '目標株価', er: '決算', rv: '予想修正', sg: 'シグナル', ib: 'インサイダー', test: 'テスト' };
 const usd_ = v => (v == null ? '—' : (v < 0 ? '-$' : '$') + Math.abs(v).toFixed(2));
 const pct_ = x => (x > 0 ? '+' : '') + (x * 100).toFixed(1) + '%';
 const esc_ = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -917,7 +1176,7 @@ function saveCfg_(r) {
     ts: r.ts || Date.now(), on: !!r.on, to: /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to) ? to : '', live: r.live !== false,
     move: Math.min(50, Math.max(1, Number(r.move) || 5)), watch: watch, px: px, names: names, types: {},
   };
-  ['px', 'mv', 'hl', 'rt', 'tp', 'er', 'rv'].forEach(k => { c.types[k] = ty[k] !== false; });
+  ['px', 'mv', 'hl', 'rt', 'tp', 'er', 'rv', 'sg'].forEach(k => { c.types[k] = ty[k] !== false; });
   if (JSON.stringify(c).length > 8500) c.names = {};
   props_().set('CFG', c);
   return c;
@@ -945,7 +1204,7 @@ function evalPrice_(c, P, t, px, prev, hi, lo, day) {
 }
 
 /** 毎朝の株価更新のあと: 終値でウォッチリストを判定し、取引時間中の見張りに使う高値・安値・前日終値を残す */
-function alertsQuotes_(st, res) {
+function alertsQuotes_(st, res, sig) {
   const c = cfg_(), P = props_(), ws = {};
   if (!c || !c.watch.length) return;
   let items = [];
@@ -962,11 +1221,19 @@ function alertsQuotes_(st, res) {
     else items = items.concat(evalPrice_(c, P, t, b[last][3], b[days[days.length - 2]][3], hiP, loP, last));
   });
   P.set('WSTATE', ws);
+  if (c.on && c.types.sg && sig) {
+    const w = {};
+    c.watch.forEach(t => { w[t] = 1; });
+    sig.items.forEach(x => {
+      if (!w[x[0]] || x[1] === 'h52' || x[1] === 'l52') return; // 52週高値・安値は値動きの通知で知らせる
+      items.push({ key: 'sg|' + x[0] + '|' + x[1] + '|' + sig.day, t: x[0], kind: 'sg', short: SIGS[x[1]], text: sigText_(x) });
+    });
+  }
   notify_(st, items);
 }
 
 /** アナリスト評価の更新のあと: 格上げ・格下げ、目標株価の変化、決算の前日、EPS予想の修正 */
-function alertsAnalyst_(st, prev, rows, earn) {
+function alertsAnalyst_(st, prev, rows, earn, own) {
   const c = cfg_();
   if (!c || !c.on || !c.watch.length) return;
   const T = c.types, today = et_(), since = et_(Date.now() - 4 * 86400000), items = [];
@@ -991,6 +1258,12 @@ function alertsAnalyst_(st, prev, rows, earn) {
       items.push({ key: 'er|' + t + '|' + e[0], t: t, kind: 'er', short: '決算 ' + md(e[0]),
         text: '決算発表 ' + md(e[0]) + '（米国時間・' + tm + '）' + (e[2] != null ? '・予想EPS ' + usd_(e[2]) : '') + (e[3] ? '（' + e[3] + '人）' : '') });
     }
+    const o = own && own[t];
+    if (o && T.sg) (o[10] || []).forEach(x => {
+      if (x[3] !== 'P' || x[0] < since) return;
+      items.push({ key: 'ib|' + t + '|' + x[0] + '|' + x[1], t: t, kind: 'ib', short: 'インサイダーの買い',
+        text: 'インサイダーの買い：' + x[1] + '（' + x[2] + '）' + (x[4] ? Number(x[4]).toLocaleString() + '株' : '') + (x[5] ? '・約' + usd_(x[5] / 1e6).replace('$', '$') + 'M' : '') + '・' + md(x[0]) });
+    });
     if (e && T.rv && e[6] != null && Math.abs(e[6]) >= 0.03) {
       items.push({ key: 'rv|' + t + '|' + week, t: t, kind: 'rv', short: '予想' + pct_(e[6]),
         text: '今期のEPS予想が7日間で ' + pct_(e[6]) + (e[10] != null ? '（30日の上方修正 ' + e[10] + '件・下方修正 ' + (e[11] || 0) + '件）' : '') });
