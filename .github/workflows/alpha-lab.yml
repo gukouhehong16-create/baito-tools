@@ -1,0 +1,40 @@
+# Alpha Lab のデータ更新。alpha-lab/request.json が書き換わる（ページの更新ボタン）と動き、
+# 取得したデータを alpha-lab-data ブランチ（履歴を持たない1コミット）に保存する。
+name: Alpha Lab データ更新
+on:
+  push:
+    branches: [claude/alpha-lab-chart-backfill-dlmu5m]
+    paths: [alpha-lab/request.json, alpha-lab/update.py, .github/workflows/alpha-lab.yml]
+permissions:
+  contents: write
+concurrency:
+  group: alpha-lab
+  cancel-in-progress: false
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: 前回のデータを取り出す
+        run: |
+          mkdir -p out
+          if git fetch --depth=1 origin alpha-lab-data; then git archive FETCH_HEAD | tar -x -C out; fi
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 取得
+        run: |
+          MODE=$(python3 -c "import json;print(json.load(open('alpha-lab/request.json')).get('mode','all'))" || echo all)
+          python3 alpha-lab/update.py "$MODE" out
+      - name: alpha-lab-data ブランチに保存
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd out
+          git init -q -b alpha-lab-data
+          git config user.name "alpha-lab-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -qm "Alpha Lab データ $(date -u +%Y-%m-%dT%H:%MZ) [CF-Pages-Skip]"
+          git push -qf "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" alpha-lab-data
