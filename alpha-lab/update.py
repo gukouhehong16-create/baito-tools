@@ -535,6 +535,50 @@ def run_analyst(out, tickers, cr, log):
                 + (f"、取得できず {len(err)}社" if err else "") + ("" if cr else "、コンセンサスは取得できず")])
 
 
+# ---------- 調査用（応答の形を確かめる） ----------
+def run_probe(out, log):
+    cr = crumb()
+    res = {"crumb": bool(cr)}
+    q = urllib.parse.quote(cr or "")
+    for t in ("AAPL", "JPM", "NVDA"):
+        for mods in ("calendarEvents,earningsTrend,earningsHistory", "defaultKeyStatistics"):
+            try:
+                res[f"{t}:{mods}"] = http(f"{Y}/v10/finance/quoteSummary/{t}?modules={mods}&crumb={q}")
+            except Exception as e:
+                res[f"{t}:{mods}"] = why(e)
+        try:
+            res[f"{t}:chart1d"] = http(f"{Y}/v8/finance/chart/{t}?range=1d&interval=1d")["chart"]["result"][0]["meta"]
+        except Exception as e:
+            res[f"{t}:chart1d"] = why(e)
+    start, end = NOW.strftime("%Y-%m-%d"), (NOW + timedelta(days=10)).strftime("%Y-%m-%d")
+    bodies = {
+        "econ": {"sortType": "ASC", "entityIdType": "economic_event", "sortField": "startdatetime",
+                 "includeFields": ["econ_release", "country_code", "startdatetime", "period", "after_release_actual",
+                                   "consensus_estimate", "prior_release_actual", "originally_reported_actual"],
+                 "query": {"operator": "and", "operands": [{"operator": "gte", "operands": ["startdatetime", start]},
+                                                           {"operator": "lte", "operands": ["startdatetime", end]}]},
+                 "offset": 0, "size": 100},
+        "earn": {"sortType": "DESC", "entityIdType": "sp_earnings", "sortField": "intradaymarketcap",
+                 "includeFields": ["ticker", "companyshortname", "intradaymarketcap", "eventname", "startdatetime",
+                                   "startdatetimetype", "epsestimate", "epsactual", "epssurprisepct"],
+                 "query": {"operator": "and", "operands": [{"operator": "gte", "operands": ["startdatetime", start]},
+                                                           {"operator": "lt", "operands": ["startdatetime", end]},
+                                                           {"operator": "eq", "operands": ["region", "us"]}]},
+                 "offset": 0, "size": 100},
+    }
+    for k, b in bodies.items():
+        for host in ("query1", "query2"):
+            try:
+                req = urllib.request.Request(f"https://{host}.finance.yahoo.com/v1/finance/visualization?lang=en-US&region=US&crumb={q}",
+                                             data=json.dumps(b).encode(), headers={**HD, "Content-Type": "application/json"})
+                with OP.open(req, timeout=25) as r:
+                    res[f"viz:{k}:{host}"] = json.loads(r.read().decode("utf-8", "replace"))
+            except Exception as e:
+                res[f"viz:{k}:{host}"] = why(e)
+    save(f"{out}/probe/probe.json", res)
+    log.append(["probe", "ok", f"調査 {len(res)}件（トークン{'あり' if cr else 'なし'}）"])
+
+
 # ---------- 入口 ----------
 def main():
     mode = (sys.argv[1] if len(sys.argv) > 1 else "all").strip() or "all"
@@ -543,6 +587,10 @@ def main():
     q = load(f"{out}/quotes.json", None) or load(f"{HERE}/seed/quotes.json", {})
     tickers = sorted(q.get("rows", {}))
     log = []
+    if mode == "probe":
+        run_probe(out, log)
+        print(log)
+        return
     if mode in ("quotes", "all"):
         run_quotes(out, tickers, log)
     cr = crumb() if mode in ("score", "analyst", "all") else None
