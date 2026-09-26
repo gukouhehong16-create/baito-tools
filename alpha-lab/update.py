@@ -201,11 +201,13 @@ def fred(sid, years):
     t, c = [], []
     for line in txt.strip().splitlines()[1:]:
         d, _, v = line.partition(",")
-        try:
-            t.append(int(datetime.strptime(d.strip(), "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp() // 86400))
-            c.append(float(f"{float(v):.5g}"))
+        try:  # 欠損（空欄や "."）の日は飛ばす。日付と値は両方そろったときだけ入れる
+            day = int(datetime.strptime(d.strip(), "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp() // 86400)
+            val = float(f"{float(v):.5g}")
         except ValueError:
             continue
+        t.append(day)
+        c.append(val)
     if not c:
         raise ValueError("no_data")
     return {"t": t, "c": c}
