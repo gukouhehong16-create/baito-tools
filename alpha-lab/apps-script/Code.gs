@@ -213,8 +213,10 @@ function put_(st, path, obj) {
   const ent = st.files[path];
   let file = null;
   if (ent && ent.id) { try { file = DriveApp.getFileById(ent.id); if (file.isTrashed()) file = null; } catch (e) { file = null; } }
+  const name = path.replace('/', '-') + '.json.gz.b64';
+  if (!file) { const it = st._data.getFilesByName(name); file = it.hasNext() ? it.next() : null; }
   if (file) file.setContent(b64);
-  else file = st._data.createFile(path.replace('/', '-') + '.json.gz.b64', b64, 'text/plain');
+  else file = st._data.createFile(name, b64, 'text/plain');
   st.files[path] = { id: file.getId(), md5: md5, at: jst_().at, n: json.length };
 }
 
@@ -296,6 +298,7 @@ function utf8len_(s) {
 
 /**
  * まとめて並列に取得する。429（混雑）や 5xx は少し待って最大3回まで取り直す。
+ * 接続できないもの（時間切れなど）は1回で諦める（1件ごとに最大1分待たされ、6分の実行上限を超えるため）。
  * 戻り値は URL と同じ順の [{code, text}]（取れなかったものは code が数値以外になる）
  */
 function many_(urls, headers, deadline, batch) {
@@ -311,12 +314,17 @@ function many_(urls, headers, deadline, batch) {
       try {
         rs = UrlFetchApp.fetchAll(part.map(i => ({ url: urls[i], headers: headers || HD, muteHttpExceptions: true })));
       } catch (e) {
-        rs = part.map(i => { try { return UrlFetchApp.fetch(urls[i], { headers: headers || HD, muteHttpExceptions: true }); } catch (e2) { return e2; } });
+        // どれかに接続できなかった: 1件ずつ取り直す。2件続けて接続できなければ残りは諦める
+        let bad = part.length === 1 ? 2 : 0;
+        rs = part.map(i => {
+          if (bad >= 2 || (deadline && Date.now() > deadline)) return e;
+          try { const r = UrlFetchApp.fetch(urls[i], { headers: headers || HD, muteHttpExceptions: true }); bad = 0; return r; } catch (e2) { bad++; return e2; }
+        });
       }
       let busy = false;
       part.forEach((i, j) => {
         const r = rs[j];
-        if (!r || typeof r.getResponseCode !== 'function') { out[i] = { code: 'net ' + msg_(r) }; again.push(i); return; }
+        if (!r || typeof r.getResponseCode !== 'function') { out[i] = { code: 'net ' + msg_(r) }; return; }
         const code = r.getResponseCode();
         if (code === 200) { out[i] = { code: 200, text: r.getContentText() }; return; }
         out[i] = { code: code };
@@ -493,6 +501,10 @@ function calendar_(universe, deadline) {
     if (d.dow >= 1 && d.dow <= 5) days.push(d.day);
   }
   const eDays = days.filter(d => d >= today), vDays = days.filter(d => d <= week);
+  const P = props_();
+  if (P.get('CALFAIL', '') === today) throw new Error('Nasdaq に接続できないため今日は省略');
+  try { one_('https://api.nasdaq.com/api/calendar/earnings?date=' + eDays[0], NQ); }
+  catch (e) { P.set('CALFAIL', today); throw e; }
   const rs = many_(eDays.map(d => 'https://api.nasdaq.com/api/calendar/earnings?date=' + d)
     .concat(vDays.map(d => 'https://api.nasdaq.com/api/calendar/economicevents?date=' + d)), NQ, deadline, 10);
   const earn = [], econ = [], s = v => (v == null ? '' : v);
@@ -806,5 +818,6 @@ function diagnose_() {
     probe('Nasdaq 予定', 'https://api.nasdaq.com/api/calendar/earnings?date=' + jst_().day, NQ),
   ].forEach(p => { out[p[0]] = p[1]; });
   out['Yahoo トークン'] = crumb_() ? 'ok' : '取得できず（アナリストのコンセンサスは調査会社の評価で代替）';
+  if (out['Nasdaq 予定'] !== 'ok') props_().set('CALFAIL', jst_().day); // 今日の更新では決算予定を取りに行かない（待ち時間を省く）
   return out;
 }
