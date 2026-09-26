@@ -10,6 +10,11 @@
  *   2. 「承認が必要です」→ 権限を確認 → アカウントを選ぶ → 許可
  *   3. 実行ログに「準備ができました」と出れば完了。以後は1分ごとに自動で動きます
  *      （ページのボタンの依頼を処理し、平日の翌朝に株価・スコア・アナリスト評価を自動で更新します）
+ *   ※ 新しい版に貼り替えたときも setup をもう一度実行してください（メール送信などの許可を求められます）
+ *
+ * メール通知: ページの「メール通知」で設定すると、ウォッチリストの銘柄について
+ *   価格アラート・大きな値動き・52週高値/安値・格上げ/格下げ・目標株価の変化・決算の前日・EPS予想の修正 をメールで知らせます。
+ *   米国市場の取引時間中は15分ごとにも見張ります。
  *
  * 止めたいとき: 関数「stop」を実行します。再開は「setup」をもう一度実行します。
  */
@@ -17,6 +22,8 @@
 const FOLDER = 'Alpha Lab データ';
 const STATUS = 'alpha-lab-status.json';
 const REQUEST = 'alpha-lab-request';
+const CONFIG = 'alpha-lab-config';
+const PAGE = 'https://claude.ai/artifact/5da48G6pbMh6pEwUJkR3Ro';
 const SEED = 'https://raw.githubusercontent.com/gukouhehong16-create/baito-tools/alpha-lab-data/quotes.json';
 // 自動更新の時刻（日本時間）。dow は曜日（0=日 … 6=土）。米国市場が閉まった後の火〜土の朝に動かす
 const SCHEDULE = [
@@ -30,7 +37,6 @@ const FETCH_MS = 250 * 1000; // 1回の実行で取得に使う時間の上限�
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36';
 const HD = { 'User-Agent': UA, 'Accept': 'application/json, text/plain, */*', 'Accept-Language': 'en-US,en;q=0.9' };
-const NQ = Object.assign({}, HD, { 'Origin': 'https://www.nasdaq.com', 'Referer': 'https://www.nasdaq.com/' });
 const CNN = Object.assign({}, HD, { 'Origin': 'https://edition.cnn.com', 'Referer': 'https://edition.cnn.com/' });
 const Y = 'https://query2.finance.yahoo.com';
 const CHUNK = 240000;
@@ -83,8 +89,9 @@ function tick() {
     const queue = P.get('QUEUE', []), sched = P.get('SCHED', {});
     let changed = false;
     const add = m => { (m === 'all' ? MODES : [m]).forEach(x => { if (MODES.indexOf(x) >= 0 && queue.indexOf(x) < 0) { queue.push(x); changed = true; } }); };
-    const reqs = takeRequests_();
-    reqs.forEach(r => add(r.mode));
+    const cfgTs = (cfg_() || {}).ts, reqs = takeInbox_(), cfgNew = (cfg_() || {}).ts !== cfgTs;
+    reqs.forEach(r => { if (r.mode !== 'testmail') add(r.mode); });
+    const wantTest = reqs.some(r => r.mode === 'testmail'), liveDue = watchDue_(P);
     // ページに新しく加わった銘柄（依頼ファイルの add）を対象に加える
     const extra = P.get('EXTRA', []);
     reqs.forEach(r => r.add.forEach(t => { t = String(t).toUpperCase(); if (/^[A-Z0-9][A-Z0-9.\-]{0,11}$/.test(t) && extra.indexOf(t) < 0) extra.push(t); }));
@@ -97,14 +104,16 @@ function tick() {
     if (prev && queue[0] === prev.mode && prev.tries >= 2) { queue.shift(); changed = true; failLater_(prev.mode, '時間内に終わりませんでした（2回）'); }
     P.set('SCHED', sched);
     P.set('QUEUE', queue);
+    const side = st => { if (wantTest) testMail_(st); if (liveDue) watchCheck_(st); st.cfgTs = (cfg_() || {}).ts || null; };
     if (!queue.length) {
       P.set('RUN', null);
-      if (changed || reqs.length) { const st = open_(); st.queue = queue; st.running = null; saveStatus_(st); }
+      if (changed || reqs.length || liveDue || cfgNew) { const st = open_(); side(st); st.queue = queue; st.running = null; saveStatus_(st); }
       return '';
     }
     const mode = queue[0];
     P.set('RUN', { mode: mode, at: now.at, tries: prev && prev.mode === mode ? (prev.tries || 0) + 1 : 1 });
     const st = open_();
+    side(st);
     st.queue = queue.slice();
     st.running = { mode: mode, at: now.at, ts: Date.now() };
     saveStatus_(st);
@@ -233,16 +242,25 @@ function get_(st, path) {
   }
 }
 
-/** ページが置いた依頼ファイル（alpha-lab-request…）を読み取って消す */
-function takeRequests_() {
-  const out = [];
-  const it = DriveApp.searchFiles("title contains '" + REQUEST + "' and trashed = false");
+/**
+ * ページが置いたファイルを読み取って消す。
+ *   alpha-lab-request… : 更新の依頼（mode・add）
+ *   alpha-lab-config…  : メール通知の設定とウォッチリスト（いちばん新しいものだけを使う）
+ */
+function takeInbox_() {
+  const out = [], cfgs = [];
+  const it = DriveApp.searchFiles("(title contains '" + REQUEST + "' or title contains '" + CONFIG + "') and trashed = false");
   while (it.hasNext()) {
     const f = it.next();
     let r = {};
     try { r = JSON.parse(f.getBlob().getDataAsString('UTF-8')) || {}; } catch (e) { r = {}; }
-    out.push({ mode: String(r.mode || 'all'), at: r.at || '', add: Array.isArray(r.add) ? r.add : [] });
+    if (f.getName().indexOf(CONFIG) === 0) cfgs.push([f.getDateCreated().getTime(), r]);
+    else out.push({ mode: String(r.mode || 'all'), at: r.at || '', add: Array.isArray(r.add) ? r.add : [] });
     try { f.setTrashed(true); } catch (e) { /* 次回もう一度読む */ }
+  }
+  if (cfgs.length) {
+    cfgs.sort((a, b) => b[0] - a[0]);
+    saveCfg_(cfgs[0][1]);
   }
   return out;
 }
@@ -494,35 +512,6 @@ function parseFng_(j) {
   };
 }
 
-function calendar_(universe, deadline) {
-  const now = jst_(), today = now.day, week = jst_(Date.now() + 7 * 86400000).day, days = [];
-  for (let i = -4; i < 15; i++) {
-    const d = jst_(Date.now() + i * 86400000);
-    if (d.dow >= 1 && d.dow <= 5) days.push(d.day);
-  }
-  const eDays = days.filter(d => d >= today), vDays = days.filter(d => d <= week);
-  const P = props_();
-  if (P.get('CALFAIL', '') === today) throw new Error('Nasdaq に接続できないため今日は省略');
-  try { one_('https://api.nasdaq.com/api/calendar/earnings?date=' + eDays[0], NQ); }
-  catch (e) { P.set('CALFAIL', today); throw e; }
-  const rs = many_(eDays.map(d => 'https://api.nasdaq.com/api/calendar/earnings?date=' + d)
-    .concat(vDays.map(d => 'https://api.nasdaq.com/api/calendar/economicevents?date=' + d)), NQ, deadline, 10);
-  const earn = [], econ = [], s = v => (v == null ? '' : v);
-  eDays.forEach((d, i) => {
-    ((json_(rs[i]).data || {}).rows || []).forEach(r => {
-      const sym = (r.symbol || '').replace(/\//g, '.');
-      if (universe[sym]) earn.push([d, sym, s(r.time), s(r.epsForecast), s(r.noOfEsts), s(r.lastYearEPS), s(r.fiscalQuarterEnding)]);
-    });
-  });
-  vDays.forEach((d, i) => {
-    ((json_(rs[eDays.length + i]).data || {}).rows || []).forEach(r => {
-      if (r.country === 'United States' && r.eventName) econ.push([d, s(r.gmt), r.eventName, s(r.actual), s(r.consensus), s(r.previous)]);
-    });
-  });
-  const order = (a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0);
-  return { earn: earn.sort(order), econ: econ.sort(order) };
-}
-
 function runQuotes_(st, tickers, q, log, deadline, t0) {
   const now = jst_();
   const AT = now.at;
@@ -591,14 +580,9 @@ function runQuotes_(st, tickers, q, log, deadline, t0) {
   if (!gotFred) econ.fred = oldEcon.fred || {};
   econ.fng = econ.fng || oldEcon.fng || null;
   if (!econ.fat) econ.fat = oldEcon.fat || null;
-  // 決算と経済指標の予定
-  try {
-    const uni = {};
-    tickers.forEach(t => { uni[t] = 1; });
-    const cal = calendar_(uni, deadline);
-    put_(st, 'meta/cal', { at: AT, earn: cal.earn, econ: cal.econ });
-  } catch (e) { diag.cal = msg_(e); }
   put_(st, 'meta/econ', econ);
+  // ウォッチリストの見張り（終値ベース）と、取引時間中の見張りに使う52週高値・安値
+  try { alertsQuotes_(st, res); } catch (e) { st.mailErr = '通知の判定に失敗: ' + msg_(e); }
   const sec = Math.round((Date.now() - t0) / 1000), ne = Object.keys(err).length, dk = Object.keys(diag);
   const note = '一斉更新: 株価' + n + '社（' + asof + (live ? '・取引中の値を含む' : '') + '）、チャート日足1年分' + Object.keys(rows).length + '社、'
     + 'マーケット指標' + Object.keys(mac).length + '種、ニュース' + Object.keys(nw).length + '社、経済データ' + Object.keys(econ.fred).length + '系列'
@@ -769,14 +753,25 @@ function parseInsights_(j) {
 /** コンセンサス（要トークン）に、調査会社（Argus など）の評価を重ねる */
 function runAnalyst_(st, tickers, cr, log, deadline, t0) {
   const now = jst_();
-  const sum = cr ? mapFetch_(tickers.map(t => Y + '/v10/finance/quoteSummary/' + ysym_(t) + '?modules=financialData,recommendationTrend,upgradeDowngradeHistory&crumb=' + encodeURIComponent(cr.crumb)),
-    parseAnalyst_, cr.headers, deadline, 20) : null;
+  // 1社につき1回の問い合わせで、推奨・目標株価・格付け変更と、決算日・EPS予想の推移・過去の決算サプライズをまとめて取る
+  const raw = cr ? many_(tickers.map(t => Y + '/v10/finance/quoteSummary/' + ysym_(t)
+    + '?modules=financialData,recommendationTrend,upgradeDowngradeHistory,calendarEvents,earningsTrend,earningsHistory&crumb=' + encodeURIComponent(cr.crumb)),
+  cr.headers, deadline, 20) : null;
+  const sum = [], earn = {};
+  tickers.forEach((t, i) => {
+    if (!raw) { sum.push(null); return; }
+    let j;
+    try { j = json_(raw[i]); } catch (e) { sum.push({ err: msg_(e) }); return; }
+    try { sum.push({ v: parseAnalyst_(j) }); } catch (e) { sum.push({ err: msg_(e) }); }
+    try { const e = parseEarn_(j); if (e) earn[t] = e; } catch (e) { /* 決算データなし */ }
+  });
   const ins = mapFetch_(tickers.map(t => Y + '/ws/insights/v2/finance/insights?symbol=' + ysym_(t) + '&lang=en-US&region=US'), parseInsights_, HD, deadline, 20);
   const rows = {}, err = {};
   tickers.forEach((t, i) => {
-    let row = sum && sum[i].v ? sum[i].v : null;
+    const s = sum[i];
+    let row = s && s.v ? s.v : null;
     const errs = [];
-    if (sum && !sum[i].v) errs.push(String(sum[i].err).slice(0, 30));
+    if (s && !s.v) errs.push(String(s.err).slice(0, 30));
     if (ins[i].v) {
       if (!row) row = { m: null, k: '', n: null, p: null, t: [ins[i].v.tp, null, null], tr: null, tr1: null, ud: [] };
       Object.keys(ins[i].v).forEach(k => { if (k !== 'tp') row[k] = ins[i].v[k]; });
@@ -794,8 +789,290 @@ function runAnalyst_(st, tickers, cr, log, deadline, t0) {
   Object.keys(rows).forEach(t => { all[t] = rows[t]; });
   const src = cr ? 'Yahoo Finance' : 'Yahoo Finance（調査会社の評価）', ne = Object.keys(err).length;
   put_(st, 'meta/analyst', { at: now.at, src: src, n: n, err: err, rows: all });
+  // 決算日・EPS予想の修正・決算サプライズと、今後2週間の決算・経済指標の予定
+  const nE = Object.keys(earn).length;
+  let allE = (get_(st, 'meta/earn') || {}).rows || {}, calNote = '';
+  if (nE >= tickers.length * 0.3) {
+    const keep = {};
+    tickers.forEach(t => { if (!earn[t] && allE[t]) keep[t] = allE[t]; });
+    allE = Object.assign(keep, earn);
+    put_(st, 'meta/earn', { at: now.at, src: 'Yahoo Finance', cols: ECOLS, rows: allE });
+    const cal = { at: now.at, src: 'Yahoo Finance', earn: calEarn_(allE), econ: [] };
+    try { cal.econ = econEvents_(cr); } catch (e) { cal.econErr = msg_(e); cal.econ = (get_(st, 'meta/cal') || {}).econ || []; }
+    put_(st, 'meta/cal', cal);
+    calNote = '、決算と予想修正 ' + nE + '社・今後2週間の決算 ' + cal.earn.length + '件・経済指標 ' + cal.econ.length + '件';
+  }
+  try { alertsAnalyst_(st, prev, all, allE); } catch (e) { st.mailErr = '通知の判定に失敗: ' + msg_(e); }
   log.push(['analyst', ne ? 'partial' : 'ok', 'アナリスト評価 ' + n + '社（' + src + '、Google Apps Script、' + Math.round((Date.now() - t0) / 1000) + '秒）'
-    + (ne ? '、取得できず ' + ne + '社' : '') + (cr ? '' : '、コンセンサスは取得できず')]);
+    + (ne ? '、取得できず ' + ne + '社' : '') + (cr ? '' : '、コンセンサスは取得できず') + calNote]);
+}
+
+
+// ========== 決算と予想修正 ==========
+
+// 決算データの列: 次回決算日・時間帯（BMO=寄付前, AMC=引け後）・EPS予想・予想人数・前年同期EPS・対象四半期の末日・
+// 今期EPS予想の7/30/90日の変化率・来期の30日の変化率・30日の上方/下方修正の件数・過去4四半期のサプライズ率と四半期・日付が推定か・売上予想（10億ドル）
+const ECOLS = ['nd', 'tm', 'est', 'ne', 'ya', 'fq', 'r7', 'r30', 'r90', 'n30', 'u30', 'd30', 'sp', 'sq', 'ds', 'rev'];
+
+function parseEarn_(j) {
+  const r = ((j.quoteSummary || {}).result || [null])[0];
+  if (!r) return null;
+  const ce = (r.calendarEvents || {}).earnings || {}, ed = (ce.earningsDate || [])[0], tr = {};
+  ((r.earningsTrend || {}).trend || []).forEach(x => { if (x && x.period) tr[x.period] = x; });
+  const q0 = tr['0q'] || {}, y0 = tr['0y'] || {}, y1 = tr['+1y'] || {}, ee = q0.earningsEstimate || {};
+  const rv = (x, k) => {
+    const e = x.epsTrend || {}, c = num_(e.current), a = num_(e[k]);
+    return c != null && a != null && Math.abs(a) >= 0.01 ? rnd_((c - a) / Math.abs(a), 4) : null;
+  };
+  const revs = (y0.epsRevisions && Object.keys(y0.epsRevisions).length ? y0 : q0).epsRevisions || {};
+  const hist = ((r.earningsHistory || {}).history || []).filter(h => h && h.quarter && num_(h.quarter) != null)
+    .sort((a, b) => num_(a.quarter) - num_(b.quarter)).slice(-4);
+  let nd = '', tm = '';
+  if (ed && typeof ed.raw === 'number') {
+    nd = ed.fmt || ymd_(ed.raw - 4 * 3600);
+    const m = Math.round((ed.raw % 86400) / 60); // 協定世界時の分: 13:30 より前は寄付前、19:30 以降は引け後
+    tm = m === 0 ? '' : m < 13 * 60 + 30 ? 'BMO' : m >= 19 * 60 + 30 ? 'AMC' : '';
+  }
+  const rev = num_(ce.revenueAverage);
+  const row = [nd, tm, num_(ee.avg != null ? ee.avg : ce.earningsAverage), num_(ee.numberOfAnalysts), num_(ee.yearAgoEps), q0.endDate || '',
+    rv(y0, '7daysAgo'), rv(y0, '30daysAgo'), rv(y0, '90daysAgo'), rv(y1, '30daysAgo'), num_(revs.upLast30days), num_(revs.downLast30days),
+    hist.map(h => num_(h.surprisePercent)), hist.map(h => String((h.quarter || {}).fmt || '').slice(0, 7)),
+    ce.isEarningsDateEstimate ? 1 : 0, rev != null ? rnd_(rev / 1e9, 3) : null];
+  if (!nd && row[2] == null && !hist.length && row[7] == null) return null;
+  return row;
+}
+
+const et_ = ms => Utilities.formatDate(new Date(ms || Date.now()), 'America/New_York', 'yyyy-MM-dd');
+const MON_ = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** 今日から2週間の決算予定（ページの決算カレンダー用。以前の Nasdaq と同じ形） */
+function calEarn_(rows) {
+  const from = et_(), to = et_(Date.now() + 14 * 86400000), out = [];
+  const $ = v => (v == null ? '' : (v < 0 ? '-$' : '$') + Math.abs(v).toFixed(2));
+  Object.keys(rows).forEach(t => {
+    const r = rows[t];
+    if (!r || !r[0] || r[0] < from || r[0] > to) return;
+    const fq = r[5] ? MON_[Number(r[5].slice(5, 7)) - 1] + '/' + r[5].slice(0, 4) : '';
+    out.push([r[0], t, r[1] === 'BMO' ? 'time-pre-market' : r[1] === 'AMC' ? 'time-after-hours' : 'time-not-supplied', $(r[2]), r[3] != null ? String(r[3]) : '', $(r[4]), fq]);
+  });
+  return out.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : a[1] < b[1] ? -1 : 1));
+}
+
+/** 米国の経済指標の予定と結果（Yahoo Finance の経済指標カレンダー） */
+function econEvents_(cr) {
+  if (!cr) throw new Error('トークンなし');
+  const start = et_(Date.now() - 4 * 86400000), end = et_(Date.now() + 15 * 86400000);
+  const ops = [{ operator: 'gte', operands: ['startdatetime', start] }, { operator: 'lte', operands: ['startdatetime', end] }];
+  const tries = [ops.concat([{ operator: 'eq', operands: ['country_code', 'US'] }]), ops];
+  let last = '';
+  for (let k = 0; k < tries.length; k++) {
+    const body = { sortType: 'ASC', entityIdType: 'economic_event', sortField: 'startdatetime', offset: 0, size: 250,
+      includeFields: ['econ_release', 'country_code', 'startdatetime', 'period', 'after_release_actual', 'consensus_estimate', 'prior_release_actual'],
+      query: { operator: 'and', operands: tries[k] } };
+    let res;
+    try {
+      res = UrlFetchApp.fetch('https://query1.finance.yahoo.com/v1/finance/visualization?lang=en-US&region=US&crumb=' + encodeURIComponent(cr.crumb),
+        { method: 'post', contentType: 'application/json', payload: JSON.stringify(body), headers: cr.headers, muteHttpExceptions: true });
+    } catch (e) { last = msg_(e); continue; }
+    if (res.getResponseCode() !== 200) { last = 'http' + res.getResponseCode(); continue; }
+    const d0 = ((((JSON.parse(res.getContentText()).finance || {}).result || [])[0] || {}).documents || [])[0] || {};
+    const cols = (d0.columns || []).map(c => c.id), ix = id => cols.indexOf(id), out = [];
+    const s = v => (v == null ? '' : String(v));
+    (d0.rows || []).forEach(row => {
+      if (row[ix('country_code')] !== 'US') return;
+      const iso = s(row[ix('startdatetime')]), ms = Date.parse(iso);
+      if (!ms) return;
+      out.push([et_(ms), iso.slice(11, 16), s(row[ix('econ_release')]).replace(/\s*\*\s*$/, '').trim(),
+        s(row[ix('after_release_actual')]), s(row[ix('consensus_estimate')]), s(row[ix('prior_release_actual')])]);
+    });
+    if (out.length) return out;
+    last = 'no_rows';
+  }
+  throw new Error(last || 'no_rows');
+}
+
+
+// ========== ウォッチリストのメール通知 ==========
+
+const KIND = { px: '価格アラート', mv: '値動き', hi: '52週高値', lo: '52週安値', rt: '格付け', tp: '目標株価', er: '決算', rv: '予想修正', test: 'テスト' };
+const usd_ = v => (v == null ? '—' : (v < 0 ? '-$' : '$') + Math.abs(v).toFixed(2));
+const pct_ = x => (x > 0 ? '+' : '') + (x * 100).toFixed(1) + '%';
+const esc_ = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const TICK_ = /^[A-Z0-9][A-Z0-9.\-]{0,11}$/;
+
+function cfg_() { return props_().get('CFG', null); }
+
+/** ページから届いた設定を確かめて保存する */
+function saveCfg_(r) {
+  const num = v => (typeof v === 'number' && isFinite(v) && v > 0 ? v : null);
+  const ty = r.types || {}, watch = (Array.isArray(r.watch) ? r.watch : []).map(t => String(t).toUpperCase()).filter(t => TICK_.test(t)).slice(0, 150);
+  const px = {}, names = {};
+  Object.keys(r.px || {}).forEach(t => {
+    const T = String(t).toUpperCase(), a = num((r.px[t] || {}).a), b = num((r.px[t] || {}).b);
+    if (TICK_.test(T) && (a || b)) px[T] = { a: a, b: b };
+  });
+  watch.forEach(t => { const n = (r.names || {})[t]; if (n) names[t] = String(n).slice(0, 28); });
+  const to = String(r.to || '').trim();
+  const c = {
+    ts: r.ts || Date.now(), on: !!r.on, to: /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to) ? to : '', live: r.live !== false,
+    move: Math.min(50, Math.max(1, Number(r.move) || 5)), watch: watch, px: px, names: names, types: {},
+  };
+  ['px', 'mv', 'hl', 'rt', 'tp', 'er', 'rv'].forEach(k => { c.types[k] = ty[k] !== false; });
+  if (JSON.stringify(c).length > 8500) c.names = {};
+  props_().set('CFG', c);
+  return c;
+}
+
+/** 値動き・価格アラート・52週高値/安値を判定する（毎朝の更新と、取引時間中の見張りで共通） */
+function evalPrice_(c, P, t, px, prev, hi, lo, day) {
+  const items = [], T = c.types, fired = P.get('FIRED', {});
+  const a = (c.px[t] || {}).a, b = (c.px[t] || {}).b;
+  [['a', a, px >= a, '以上'], ['b', b, px <= b, '以下']].forEach(x => {
+    if (!x[1] || !T.px) return;
+    const k = x[0] + '|' + t + '|' + x[1];
+    if (x[2]) {
+      if (!fired[k]) { fired[k] = 1; items.push({ key: 'px|' + k + '|' + Date.now(), t: t, kind: 'px', short: '価格 ' + usd_(px), text: '株価 ' + usd_(px) + ' が、設定した ' + usd_(x[1]) + ' ' + x[3] + 'になりました' }); }
+    } else delete fired[k];
+  });
+  P.set('FIRED', fired);
+  if (T.mv && prev) {
+    const ch = px / prev - 1;
+    if (Math.abs(ch) >= c.move / 100) items.push({ key: 'mv|' + t + '|' + day, t: t, kind: 'mv', short: pct_(ch), text: (ch > 0 ? '上昇 ' : '下落 ') + pct_(ch) + '（' + usd_(px) + '、前日 ' + usd_(prev) + '）' });
+  }
+  if (T.hl && hi && px > hi) items.push({ key: 'hi|' + t + '|' + day, t: t, kind: 'hi', short: '52週高値', text: '52週高値を更新（' + usd_(px) + '、これまでの高値 ' + usd_(hi) + '）' });
+  if (T.hl && lo && px < lo) items.push({ key: 'lo|' + t + '|' + day, t: t, kind: 'lo', short: '52週安値', text: '52週安値を更新（' + usd_(px) + '、これまでの安値 ' + usd_(lo) + '）' });
+  return items;
+}
+
+/** 毎朝の株価更新のあと: 終値でウォッチリストを判定し、取引時間中の見張りに使う高値・安値・前日終値を残す */
+function alertsQuotes_(st, res) {
+  const c = cfg_(), P = props_(), ws = {};
+  if (!c || !c.watch.length) return;
+  let items = [];
+  c.watch.forEach(t => {
+    const r = res[t];
+    if (!r) return;
+    const b = r.bars, days = Object.keys(b).sort();
+    if (days.length < 3) return;
+    const last = days[days.length - 1], past = days.slice(-253, -1);
+    const hiP = Math.max.apply(null, past.map(d => b[d][1])), loP = Math.min.apply(null, past.map(d => b[d][2]));
+    ws[t] = [Math.max(hiP, b[last][1]), Math.min(loP, b[last][2]), b[last][3], last];
+    if (!c.on) return;
+    if (r.live) items = items.concat(evalPrice_(c, P, t, r.p, b[last][3], ws[t][0], ws[t][1], r.pt.slice(0, 10)));
+    else items = items.concat(evalPrice_(c, P, t, b[last][3], b[days[days.length - 2]][3], hiP, loP, last));
+  });
+  P.set('WSTATE', ws);
+  notify_(st, items);
+}
+
+/** アナリスト評価の更新のあと: 格上げ・格下げ、目標株価の変化、決算の前日、EPS予想の修正 */
+function alertsAnalyst_(st, prev, rows, earn) {
+  const c = cfg_();
+  if (!c || !c.on || !c.watch.length) return;
+  const T = c.types, today = et_(), since = et_(Date.now() - 4 * 86400000), items = [];
+  const d = new Date(Date.parse(today + 'T12:00:00Z'));
+  do { d.setUTCDate(d.getUTCDate() + 1); } while (d.getUTCDay() === 0 || d.getUTCDay() === 6);
+  const nextBiz = d.toISOString().slice(0, 10), hourET = Number(Utilities.formatDate(new Date(), 'America/New_York', 'H'));
+  const ACT = { up: '格上げ', down: '格下げ', init: '新規カバー' }, week = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'YYYY-ww');
+  const md = s => Number(s.slice(5, 7)) + '/' + Number(s.slice(8, 10));
+  c.watch.forEach(t => {
+    const r = rows[t], p = prev[t], e = earn[t];
+    if (r && T.rt) (r.ud || []).forEach(u => {
+      if (!ACT[u[2]] || u[0] < since) return;
+      items.push({ key: 'rt|' + t + '|' + u[0] + '|' + u[1] + '|' + u[2], t: t, kind: 'rt', short: ACT[u[2]],
+        text: ACT[u[2]] + '：' + u[1] + '（' + (u[3] ? u[3] + ' → ' : '') + u[4] + '）' + (u[5] ? '・目標 ' + usd_(u[5]) : '') + '・' + md(u[0]) });
+    });
+    const tn = r && r.t && r.t[0], tp = p && p.t && p.t[0];
+    if (T.tp && tn && tp && Math.abs(tn / tp - 1) >= 0.05) {
+      items.push({ key: 'tp|' + t + '|' + today, t: t, kind: 'tp', short: '目標株価' + pct_(tn / tp - 1), text: '平均目標株価 ' + usd_(tp) + ' → ' + usd_(tn) + '（' + pct_(tn / tp - 1) + '）' });
+    }
+    if (e && T.er && e[0] && (e[0] === nextBiz || (e[0] === today && hourET < 16))) {
+      const tm = e[1] === 'BMO' ? '寄付前' : e[1] === 'AMC' ? '引け後' : '時間未定';
+      items.push({ key: 'er|' + t + '|' + e[0], t: t, kind: 'er', short: '決算 ' + md(e[0]),
+        text: '決算発表 ' + md(e[0]) + '（米国時間・' + tm + '）' + (e[2] != null ? '・予想EPS ' + usd_(e[2]) : '') + (e[3] ? '（' + e[3] + '人）' : '') });
+    }
+    if (e && T.rv && e[6] != null && Math.abs(e[6]) >= 0.03) {
+      items.push({ key: 'rv|' + t + '|' + week, t: t, kind: 'rv', short: '予想' + pct_(e[6]),
+        text: '今期のEPS予想が7日間で ' + pct_(e[6]) + (e[10] != null ? '（30日の上方修正 ' + e[10] + '件・下方修正 ' + (e[11] || 0) + '件）' : '') });
+    }
+  });
+  notify_(st, items);
+}
+
+/** 米国市場の取引時間中（平日 9:30〜16:05 ニューヨーク時間）で、前回の見張りから15分たったか */
+function watchDue_(P) {
+  const c = cfg_();
+  if (!c || !c.on || !c.live || !c.watch.length) return false;
+  const u = Utilities.formatDate(new Date(), 'America/New_York', 'u HH:mm').split(' ');
+  if (Number(u[0]) > 5 || u[1] < '09:30' || u[1] > '16:05') return false;
+  return Date.now() - P.get('WLAST', 0) >= 14.5 * 60000;
+}
+
+/** 取引時間中の見張り: ウォッチリストの現在値を取り、値動き・価格アラート・52週高値/安値を判定する */
+function watchCheck_(st) {
+  const c = cfg_(), P = props_(), ws = P.get('WSTATE', {}), day = et_();
+  P.set('WLAST', Date.now());
+  const rs = many_(c.watch.map(t => Y + '/v8/finance/chart/' + ysym_(t) + '?range=1d&interval=1d'), HD, Date.now() + 60000, 25);
+  let items = [], ok = 0;
+  c.watch.forEach((t, i) => {
+    let m;
+    try { m = json_(rs[i]).chart.result[0].meta; } catch (e) { return; }
+    const px = m.regularMarketPrice, prev = m.chartPreviousClose;
+    if (!px) return;
+    ok++;
+    const w = ws[t] && ws[t][3] < day ? ws[t] : null; // 前の取引日までの高値・安値
+    items = items.concat(evalPrice_(c, P, t, px, prev, w ? w[0] : null, w ? w[1] : null, day));
+  });
+  st.live = { at: jst_().at, n: c.watch.length, ok: ok };
+  notify_(st, items);
+}
+
+/** 条件に合ったものを、まだ知らせていなければ1通にまとめて送る */
+function notify_(st, items) {
+  const c = cfg_();
+  if (!c || !c.on || !items.length) return 0;
+  const P = props_(), sent = P.get('SENT', {}), now = jst_(), fresh = [];
+  items.forEach(it => { if (!sent[it.key]) { sent[it.key] = now.day; fresh.push(it); } });
+  const cut = jst_(Date.now() - 8 * 86400000).day;
+  let keys = Object.keys(sent).filter(k => sent[k] >= cut).sort((a, b) => (sent[a] < sent[b] ? -1 : 1));
+  while (keys.length && JSON.stringify(keys).length > 7500) keys = keys.slice(1);
+  const keep = {};
+  keys.forEach(k => { keep[k] = sent[k]; });
+  P.set('SENT', keep);
+  if (!fresh.length) return 0;
+  st.alerts = (st.alerts || []).concat(fresh.map(it => [now.at, it.t, it.kind, it.text])).slice(-80);
+  sendMail_(st, c, fresh);
+  return fresh.length;
+}
+
+function sendMail_(st, c, items, subject) {
+  let to = c.to;
+  try { to = to || Session.getEffectiveUser().getEmail(); } catch (e) { /* 下で失敗として記録 */ }
+  const now = jst_(), names = c.names || {};
+  const sub = subject || ('Alpha Lab｜' + items.slice(0, 2).map(it => it.t + ' ' + it.short).join('・') + (items.length > 2 ? ' ほか' + (items.length - 2) + '件' : ''));
+  const td = 'padding:10px 8px;border-top:1px solid #E3E6EA;vertical-align:top';
+  const html = '<div style="font-family:-apple-system,\'Hiragino Sans\',\'Noto Sans JP\',sans-serif;color:#111418;max-width:600px">'
+    + '<p style="font-size:13px;color:#667080;margin:0 0 10px">Alpha Lab の見張り・' + esc_(now.at) + '（日本時間）</p>'
+    + '<table style="border-collapse:collapse;width:100%;font-size:14px;line-height:1.5">'
+    + items.map(it => '<tr><td style="' + td + ';white-space:nowrap"><b>' + esc_(it.t) + '</b>' + (names[it.t] ? '<br><span style="color:#667080;font-size:12px">' + esc_(names[it.t]) + '</span>' : '') + '</td>'
+      + '<td style="' + td + '"><span style="font-size:11px;color:#667080">' + esc_(KIND[it.kind] || '') + '</span><br>' + esc_(it.text) + '</td></tr>').join('')
+    + '</table><p style="margin:16px 0 0"><a href="' + PAGE + '" style="color:#2B48D6">Alpha Lab を開く</a></p>'
+    + '<p style="font-size:11px;color:#9098A3;margin-top:14px">Google Apps Script から自動で送っています。止めるには Alpha Lab の「メール通知」をオフにしてください。</p></div>';
+  try {
+    if (!to) throw new Error('送信先がありません');
+    if (MailApp.getRemainingDailyQuota() < 1) throw new Error('今日の送信上限に達しました');
+    MailApp.sendEmail({ to: to, subject: sub, htmlBody: html, name: 'Alpha Lab' });
+    st.mail = { at: now.at, ok: true, to: to, n: items.length };
+  } catch (e) {
+    st.mail = { at: now.at, ok: false, to: to || '', err: msg_(e) };
+  }
+}
+
+/** ページの「テスト送信」 */
+function testMail_(st) {
+  const c = cfg_() || { watch: [], names: {}, types: {} };
+  sendMail_(st, c, [{ t: 'Alpha Lab', kind: 'test', short: '', text: 'メール通知のテストです。ウォッチリスト ' + (c.watch || []).length + '銘柄を見張っています'
+    + (c.on ? '。' : '（通知は今オフです）。') }], 'Alpha Lab｜メール通知のテスト');
 }
 
 
@@ -815,9 +1092,7 @@ function diagnose_() {
     probe('Yahoo ニュース', Y + '/v1/finance/search?q=AAPL&quotesCount=0&newsCount=2', HD),
     probe('FRED 経済データ', fredUrl_('DFF', 1), HD, t => t.indexOf('DFF') >= 0),
     probe('CNN Fear & Greed', 'https://production.dataviz.cnn.io/index/fearandgreed/graphdata/' + jst_().day, CNN),
-    probe('Nasdaq 予定', 'https://api.nasdaq.com/api/calendar/earnings?date=' + jst_().day, NQ),
   ].forEach(p => { out[p[0]] = p[1]; });
   out['Yahoo トークン'] = crumb_() ? 'ok' : '取得できず（アナリストのコンセンサスは調査会社の評価で代替）';
-  if (out['Nasdaq 予定'] !== 'ok') props_().set('CALFAIL', jst_().day); // 今日の更新では決算予定を取りに行かない（待ち時間を省く）
   return out;
 }
