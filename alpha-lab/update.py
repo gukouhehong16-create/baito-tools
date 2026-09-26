@@ -541,7 +541,7 @@ def run_probe(out, log):
     res = {"crumb": bool(cr)}
     q = urllib.parse.quote(cr or "")
     for t in ("AAPL", "JPM", "NVDA"):
-        for mods in ("calendarEvents,earningsTrend,earningsHistory", "defaultKeyStatistics"):
+        for mods in ("netSharePurchaseActivity,insiderTransactions,majorHoldersBreakdown", "defaultKeyStatistics"):
             try:
                 res[f"{t}:{mods}"] = http(f"{Y}/v10/finance/quoteSummary/{t}?modules={mods}&crumb={q}")
             except Exception as e:
