@@ -1,16 +1,21 @@
 /**
- * Alpha Lab 自動更新スクリプト（Google Apps Script）
+ * Alpha Lab 自動更新スクリプト（Google Apps Script）第5版
  *
  * Claude を使わずに、株価・チャート・マーケット指標・ニュース・経済データ・決算予定・スコア用の財務指標・
  * アナリスト評価を Yahoo Finance などから取得し、Google ドライブの「Alpha Lab データ」フォルダに保存します。
  * Alpha Lab のページは Google Drive コネクタでこのフォルダを読み、ページの更新ボタンはこのフォルダに依頼ファイルを置きます。
  *
- * 使い方（最初の1回だけ）
- *   1. 上の関数の選択欄で「setup」を選び、▶ 実行 を押す
+ * 使い方
+ *   1. このコードを全部貼り付けて保存し、上の関数の選択欄で「setup」を選んで ▶ 実行 を押す
  *   2. 「承認が必要です」→ 権限を確認 → アカウントを選ぶ → 許可
  *   3. 実行ログに「準備ができました」と出れば完了。以後は1分ごとに自動で動きます
  *      （ページのボタンの依頼を処理し、平日の翌朝に株価・スコア・アナリスト評価を自動で更新します）
- *   ※ 新しい版に貼り替えたときも setup をもう一度実行してください（メール送信などの許可を求められます）
+ *
+ * 新しい版に貼り替えるとき: 新しいプロジェクトは作らずに、このプロジェクト（setup で名前が「Alpha Lab 更新スクリプト」になります）の
+ *   中身を全部消して貼り付け、保存して setup をもう一度実行してください。
+ *   同じスクリプトが2つ以上動くと、ページの依頼を取り合って更新できなくなります。第5版は最後に setup したプロジェクトだけが動き、
+ *   ほかのプロジェクトに残った第5版は自分で止まります。第4版までの古いプロジェクト（「無題のプロジェクト」）は自分では止まらないので、
+ *   https://script.google.com/home/triggers でトリガーを削除してください（動いている間はページに案内が出ます）。
  *
  * メール通知: ページの「メール通知」で設定すると、ウォッチリストの銘柄について
  *   価格アラート・大きな値動き・52週高値/安値・格上げ/格下げ・目標株価の変化・決算の前日・EPS予想の修正 をメールで知らせます。
@@ -22,12 +27,20 @@
  * 止めたいとき: 関数「stop」を実行します。再開は「setup」をもう一度実行します。
  */
 
+const VER = '5.0';
+const NAME = 'Alpha Lab 更新スクリプト'; // setup でこのプロジェクトに付ける名前
 const FOLDER = 'Alpha Lab データ';
-const STATUS = 'alpha-lab-status.json';
-const REQUEST = 'alpha-lab-request';
-const CONFIG = 'alpha-lab-config';
+// 第5版のファイル名。第4版までと名前を変え、古いプロジェクトが動き続けていても依頼やデータが混ざらないようにしている
+const STATUS = 'alab-status.json'; // ページが読む状態ファイル（データの一覧とハッシュ・更新の結果）
+const DATA = 'data5'; // データの保存先（フォルダ）
+const OWNER = 'alab-owner.json'; // 更新を受け持つプロジェクト
+const REQUEST = 'alab-req'; // ページの更新ボタンが置く依頼
+const CONFIG = 'alab-config'; // ページの「メール通知」の設定
+const UNIVERSE = 'alab-universe'; // ページの銘柄とセクターの一覧
+// 第4版までの名前（データを移すときと、古いプロジェクトが動いていないかを確かめるときに使う）
+const OLD = { status: 'alpha-lab-status.json', data: 'data', request: 'alpha-lab-request', config: 'alpha-lab-config', universe: 'alpha-lab-universe' };
 const PAGE = 'https://claude.ai/artifact/5da48G6pbMh6pEwUJkR3Ro';
-const SEED = 'https://raw.githubusercontent.com/gukouhehong16-create/baito-tools/alpha-lab-data/quotes.json';
+const SEED = 'https://raw.githubusercontent.com/gukouhehong16-create/baito-tools/claude/alpha-lab-chart-backfill-dlmu5m/alpha-lab/seed/quotes.json';
 // 自動更新の時刻（日本時間）。dow は曜日（0=日 … 6=土）。米国市場が閉まった後の火〜土の朝に動かす
 const SCHEDULE = [
   { mode: 'quotes', dow: [2, 3, 4, 5, 6], at: '06:40' },
@@ -37,6 +50,7 @@ const SCHEDULE = [
 const MODES = ['quotes', 'score', 'analyst'];
 const JOBS = { quotes: 'bulk', score: 'score', analyst: 'analyst' };
 const FETCH_MS = 250 * 1000; // 1回の実行で取得に使う時間の上限（実行は最長6分）
+const MIN = 60 * 1000;
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36';
 const HD = { 'User-Agent': UA, 'Accept': 'application/json, text/plain, */*', 'Accept-Language': 'en-US,en;q=0.9' };
@@ -60,27 +74,46 @@ const TYPES = [].concat(
 
 // ========== 入口 ==========
 
-/** 最初に1回だけ実行する: フォルダ・状態ファイル・1分ごとのトリガーを用意し、接続を確かめてから最初の更新を始める */
+/**
+ * 最初に1回（新しい版に貼り替えたときも）実行する: このプロジェクトを更新の受け持ちにし、1分ごとのトリガーを用意し、
+ * 第4版までのデータを移してから、接続を確かめて最初の更新を始める
+ */
 function setup() {
-  const st = open_();
-  ScriptApp.getProjectTriggers().filter(t => t.getHandlerFunction() === 'tick').forEach(t => ScriptApp.deleteTrigger(t));
-  ScriptApp.newTrigger('tick').timeBased().everyMinutes(1).create();
-  const d = diagnose_();
-  st.diag = d;
-  Logger.log('接続テスト: ' + JSON.stringify(d));
-  const today = jst_().day;
-  const P = props_();
-  const sched = P.get('SCHED', {});
-  SCHEDULE.forEach(s => { sched[s.mode] = today; });
-  P.set('SCHED', sched);
-  P.set('QUEUE', MODES.slice());
-  P.set('RUN', null);
-  st.note = '準備ができました';
-  saveStatus_(st);
-  Logger.log('準備ができました。フォルダ「' + FOLDER + '」に保存します。続けて最初の更新（株価・チャート）を始めます。');
+  const P = props_(), lock = LockService.getScriptLock();
+  if (!lock.tryLock(90000)) {
+    Logger.log('いま更新を実行中です。数分たってから、もう一度 setup を実行してください。');
+    return;
+  }
+  let st, moved;
+  try {
+    const root = folder_(P.raw);
+    owner_(P, root, true);
+    const named = rename_();
+    ScriptApp.getProjectTriggers().filter(t => t.getHandlerFunction() === 'tick').forEach(t => ScriptApp.deleteTrigger(t));
+    ScriptApp.newTrigger('tick').timeBased().everyMinutes(1).create();
+    st = open_();
+    moved = init_(st, P);
+    st.diag = diagnose_();
+    Logger.log('接続テスト: ' + JSON.stringify(st.diag));
+    const today = jst_().day, sched = P.get('SCHED', {});
+    SCHEDULE.forEach(s => { sched[s.mode] = today; });
+    P.set('SCHED', sched);
+    P.set('QUEUE', MODES.slice());
+    P.set('RUN', null);
+    P.set('PINGNEXT', 0);
+    st.note = '準備ができました';
+    saveStatus_(st);
+    if (named) Logger.log('このプロジェクトの名前を「' + NAME + '」にしました。次に新しい版が出たときも、このプロジェクトに貼り替えてください。');
+    if (moved && moved.files) Logger.log('第4版までのデータ ' + moved.files + '件を、フォルダ「' + FOLDER + '」の「' + DATA + '」に移しました。');
+    Logger.log('古いプロジェクト（「無題のプロジェクト」）が残っていたら、https://script.google.com/home/triggers でそのトリガーを削除してください。'
+      + '動いているかどうかは数分後にページに表示されます。');
+  } finally {
+    lock.releaseLock();
+  }
+  Logger.log('準備ができました（第' + VER + '版）。フォルダ「' + FOLDER + '」に保存します。続けて最初の更新（株価・チャート）を始めます。');
   const done = tick();
   Logger.log(done ? done + ' の更新が終わりました。残りは、この後1分ごとの自動実行で順に更新されます。'
-    : '最初の更新は1分ごとの自動実行で始まります。数分後にフォルダ「' + FOLDER + '」を確認してください。');
+    : '最初の更新は1分ごとの自動実行で始まります。数分後にページを開き直してください。');
 }
 
 /** 1分ごとに動く: ページからの依頼と定期更新を受け付け、待ち行列の先頭を1つ実行する（実行した種類を返す） */
@@ -88,13 +121,17 @@ function tick() {
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(1000)) return '';
   try {
-    const t0 = Date.now(), P = props_(), now = jst_();
+    const t0 = Date.now(), P = props_(), now = jst_(), root = folder_(P.raw);
+    if (!owner_(P, root, false)) return '';
+    if (!P.get('MIGRATED', null)) { const s0 = open_(); init_(s0, P); saveStatus_(s0); }
     const queue = P.get('QUEUE', []), sched = P.get('SCHED', {});
     let changed = false;
     const add = m => { (m === 'all' ? MODES : [m]).forEach(x => { if (MODES.indexOf(x) >= 0 && queue.indexOf(x) < 0) { queue.push(x); changed = true; } }); };
-    const cfgTs = (cfg_() || {}).ts, reqs = takeInbox_(), cfgNew = (cfg_() || {}).ts !== cfgTs;
+    const cfgTs = (cfg_() || {}).ts, reqs = takeInbox_(root), cfgNew = (cfg_() || {}).ts !== cfgTs;
     reqs.forEach(r => { if (r.mode !== 'testmail') add(r.mode); });
     const wantTest = reqs.some(r => r.mode === 'testmail'), liveDue = watchDue_(P);
+    // 受け付けた依頼（ページは ts で自分の依頼が届いたかを確かめる）
+    const acc = reqs.map(r => ({ ts: r.ts, mode: r.mode, at: now.at }));
     // ページに新しく加わった銘柄（依頼ファイルの add）を対象に加える
     const extra = P.get('EXTRA', []);
     reqs.forEach(r => r.add.forEach(t => { t = String(t).toUpperCase(); if (/^[A-Z0-9][A-Z0-9.\-]{0,11}$/.test(t) && extra.indexOf(t) < 0) extra.push(t); }));
@@ -107,10 +144,18 @@ function tick() {
     if (prev && queue[0] === prev.mode && prev.tries >= 2) { queue.shift(); changed = true; failLater_(prev.mode, '時間内に終わりませんでした（2回）'); }
     P.set('SCHED', sched);
     P.set('QUEUE', queue);
-    const side = st => { if (wantTest) testMail_(st); if (liveDue) watchCheck_(st); st.cfgTs = (cfg_() || {}).ts || null; };
+    const old0 = JSON.stringify(P.get('OLD', null)), old = pingOld_(P, root), oldNew = JSON.stringify(old) !== old0;
+    const beat = Date.now() - P.get('BEAT', 0) >= 10 * MIN; // 動いていることをページに知らせる（10分ごと）
+    const side = st => {
+      if (wantTest) testMail_(st);
+      if (liveDue) watchCheck_(st);
+      st.cfgTs = (cfg_() || {}).ts || null;
+      if (acc.length) st.acc = (st.acc || []).concat(acc).slice(-12);
+      st.old = old;
+    };
     if (!queue.length) {
       P.set('RUN', null);
-      if (changed || reqs.length || liveDue || cfgNew) { const st = open_(); side(st); st.queue = queue; st.running = null; saveStatus_(st); }
+      if (changed || reqs.length || liveDue || cfgNew || oldNew || beat) { const st = open_(); side(st); st.queue = queue; st.running = null; saveStatus_(st); }
       return '';
     }
     const mode = queue[0];
@@ -171,41 +216,54 @@ function props_() {
   };
 }
 
+/** ID のファイル（ゴミ箱のもの・見つからないものは null） */
+function byId_(id) {
+  if (!id) return null;
+  try { const f = DriveApp.getFileById(id); return f.isTrashed() ? null : f; } catch (e) { return null; }
+}
+
+/** 名前で探した中の、ゴミ箱にないものの最初の1つ */
+function first_(it) {
+  while (it.hasNext()) { const f = it.next(); if (!f.isTrashed()) return f; }
+  return null;
+}
+
 function folder_(P) {
   const id = P.getProperty('FOLDER');
   if (id) { try { const f = DriveApp.getFolderById(id); if (!f.isTrashed()) return f; } catch (e) { /* 作り直す */ } }
-  const it = DriveApp.getRootFolder().getFoldersByName(FOLDER);
-  const f = it.hasNext() ? it.next() : DriveApp.createFolder(FOLDER);
+  const f = first_(DriveApp.getRootFolder().getFoldersByName(FOLDER)) || DriveApp.createFolder(FOLDER);
   P.setProperty('FOLDER', f.getId());
   return f;
 }
 
 function dataFolder_(P, root) {
-  const id = P.getProperty('DATA');
+  const id = P.getProperty('DATA5');
   if (id) { try { const f = DriveApp.getFolderById(id); if (!f.isTrashed()) return f; } catch (e) { /* 作り直す */ } }
-  const it = root.getFoldersByName('data');
-  const f = it.hasNext() ? it.next() : root.createFolder('data');
-  P.setProperty('DATA', f.getId());
+  const f = first_(root.getFoldersByName(DATA)) || root.createFolder(DATA);
+  P.setProperty('DATA5', f.getId());
   return f;
 }
 
 /** 状態ファイルを開く（なければ作る）。ページはこのファイルで、どのデータがいつ更新されたかを知る */
 function open_() {
   const P = PropertiesService.getScriptProperties(), root = folder_(P), data = dataFolder_(P, root);
-  let file = null;
-  const id = P.getProperty('STATUS');
-  if (id) { try { file = DriveApp.getFileById(id); if (file.isTrashed()) file = null; } catch (e) { file = null; } }
-  if (!file) { const it = root.getFilesByName(STATUS); file = it.hasNext() ? it.next() : null; }
-  let st = null;
+  let file = byId_(P.getProperty('STATUS5')) || first_(root.getFilesByName(STATUS)), st = null;
   if (file) { try { st = JSON.parse(file.getBlob().getDataAsString('UTF-8')); } catch (e) { st = null; } }
   if (!file) file = root.createFile(STATUS, '{}', 'application/json');
-  P.setProperty('STATUS', file.getId());
-  st = st && st.app === 'alpha-lab' ? st : { app: 'alpha-lab', v: 1, files: {}, jobs: {}, log: [] };
+  P.setProperty('STATUS5', file.getId());
+  st = st && st.app === 'alpha-lab' && st.v === 5 ? st : { app: 'alpha-lab', v: 5, files: {}, jobs: {}, log: [] };
+  const sid = ScriptApp.getScriptId();
+  st.ver = VER;
   st.folderId = root.getId();
   st.dataId = data.getId();
   st.statusId = file.getId();
+  st.sid = sid;
+  st.scriptUrl = 'https://script.google.com/d/' + sid + '/edit';
+  // ページが置くファイルの名前（ページはこれを見て、第5版用の名前で依頼する）
+  st.names = { req: REQUEST + '.json', cfg: CONFIG + '.json', uni: UNIVERSE + '.json' };
   st._file = file;
   st._data = data;
+  st._root = root;
   return st;
 }
 
@@ -216,21 +274,22 @@ function saveStatus_(st) {
   const out = {};
   Object.keys(st).forEach(k => { if (k.charAt(0) !== '_') out[k] = st[k]; });
   st._file.setContent(JSON.stringify(out));
+  props_().set('BEAT', st.ts);
 }
 
 /** データを gzip → base64 の文字列にして保存する（ファイルIDは変えずに中身だけ差し替える） */
 function put_(st, path, obj) {
   const json = JSON.stringify(obj);
-  const b64 = Utilities.base64Encode(Utilities.gzip(Utilities.newBlob(json, 'application/json')).getBytes());
+  save_(st, path, Utilities.base64Encode(Utilities.gzip(Utilities.newBlob(json, 'application/json')).getBytes()), json, jst_().at);
+}
+
+/** gzip＋base64 にした中身（b64）を保存し、元の JSON のハッシュを状態ファイルに書く（ページはハッシュが変わったものだけを読む） */
+function save_(st, path, b64, json, at) {
   const md5 = hex_(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, json, Utilities.Charset.UTF_8));
-  const ent = st.files[path];
-  let file = null;
-  if (ent && ent.id) { try { file = DriveApp.getFileById(ent.id); if (file.isTrashed()) file = null; } catch (e) { file = null; } }
-  const name = path.replace('/', '-') + '.json.gz.b64';
-  if (!file) { const it = st._data.getFilesByName(name); file = it.hasNext() ? it.next() : null; }
+  const ent = st.files[path], name = path.replace('/', '-') + '.json.gz.b64';
+  const file = byId_(ent && ent.id) || first_(st._data.getFilesByName(name));
   if (file) file.setContent(b64);
-  else file = st._data.createFile(name, b64, 'text/plain');
-  st.files[path] = { id: file.getId(), md5: md5, at: jst_().at, n: json.length };
+  st.files[path] = { id: (file || st._data.createFile(name, b64, 'text/plain')).getId(), md5: md5, at: at, n: json.length };
 }
 
 /** 前回保存したデータを読む */
@@ -238,28 +297,32 @@ function get_(st, path) {
   const ent = st.files[path];
   if (!ent || !ent.id) return null;
   try {
-    const b64 = DriveApp.getFileById(ent.id).getBlob().getDataAsString('UTF-8').trim();
-    const gz = Utilities.newBlob(Utilities.base64Decode(b64), 'application/x-gzip');
-    return JSON.parse(Utilities.ungzip(gz).getDataAsString('UTF-8'));
+    return JSON.parse(unpack_(DriveApp.getFileById(ent.id).getBlob().getDataAsString('UTF-8')));
   } catch (e) {
     return null;
   }
 }
 
+const unpack_ = b64 => Utilities.ungzip(Utilities.newBlob(Utilities.base64Decode(String(b64).trim()), 'application/x-gzip')).getDataAsString('UTF-8');
+
 /**
- * ページが置いたファイルを読み取って消す。
- *   alpha-lab-request… : 更新の依頼（mode・add）
- *   alpha-lab-config…  : メール通知の設定とウォッチリスト（いちばん新しいものだけを使う）
+ * ページが置いたファイルを読み取って消す（このフォルダの中の、第5版の名前のものだけ）。
+ *   alab-req…    : 更新の依頼（mode・ts・add）
+ *   alab-config… : メール通知の設定とウォッチリスト（いちばん新しいものだけを使う）
  */
-function takeInbox_() {
+function takeInbox_(root) {
+  return inbox_(root.searchFiles("(title contains '" + REQUEST + "' or title contains '" + CONFIG + "') and trashed = false"), REQUEST, CONFIG);
+}
+
+function inbox_(it, request, config) {
   const out = [], cfgs = [];
-  const it = DriveApp.searchFiles("(title contains '" + REQUEST + "' or title contains '" + CONFIG + "') and trashed = false");
   while (it.hasNext()) {
-    const f = it.next();
+    const f = it.next(), name = f.getName(), isCfg = name.indexOf(config) === 0;
+    if (!isCfg && name.indexOf(request) !== 0) continue; // 名前が似ているだけのファイルには触らない
     let r = {};
     try { r = JSON.parse(f.getBlob().getDataAsString('UTF-8')) || {}; } catch (e) { r = {}; }
-    if (f.getName().indexOf(CONFIG) === 0) cfgs.push([f.getDateCreated().getTime(), r]);
-    else out.push({ mode: String(r.mode || 'all'), at: r.at || '', add: Array.isArray(r.add) ? r.add : [] });
+    if (isCfg) cfgs.push([f.getDateCreated().getTime(), r]);
+    else out.push({ mode: String(r.mode || 'all'), at: r.at || '', ts: Number(r.ts) || 0, add: Array.isArray(r.add) ? r.add : [] });
     try { f.setTrashed(true); } catch (e) { /* 次回もう一度読む */ }
   }
   if (cfgs.length) {
@@ -287,6 +350,150 @@ function failLater_(mode, why) {
   saveStatus_(st);
 }
 
+
+// ========== 受け持ち・第4版からの引っ越し ==========
+
+/**
+ * 更新を受け持つプロジェクトを1つにする。setup したプロジェクトが受け持ち（claim）、受け持ちのプロジェクトだけが更新する。
+ * 受け持ちではないのに1分ごとの実行が残っているプロジェクト（貼り替える前のコピーなど）は、自分のトリガーを消して止まる。
+ * 受け持ちのプロジェクトが30分以上動いていなければ（削除されたなど）、代わりに受け持つ。確かめるのは5分ごと
+ */
+function owner_(P, root, claim) {
+  const me = ScriptApp.getScriptId(), now = Date.now();
+  if (!claim && now - P.get('OWNCHK', 0) < 5 * MIN) return true;
+  let f = byId_(P.raw.getProperty('OWNERID')) || first_(root.getFilesByName(OWNER)), o = null;
+  if (f) { try { o = JSON.parse(f.getBlob().getDataAsString('UTF-8')); } catch (e) { o = null; } }
+  if (!claim && o && o.sid && o.sid !== me) {
+    let last = o.ts || 0;
+    const sf = first_(root.getFilesByName(STATUS));
+    if (sf) { try { last = Math.max(last, JSON.parse(sf.getBlob().getDataAsString('UTF-8')).ts || 0); } catch (e) { /* 受け持ちの最終稼働が分からない */ } }
+    if (now - last < 30 * MIN) {
+      ScriptApp.getProjectTriggers().filter(t => t.getHandlerFunction() === 'tick').forEach(t => ScriptApp.deleteTrigger(t));
+      Logger.log('別のプロジェクト（' + (o.url || o.sid) + '）が更新を受け持っているので、このプロジェクトの自動実行を止めました。'
+        + 'このプロジェクトで動かしたいときは setup を実行してください。');
+      return false;
+    }
+  }
+  if (claim || !o || o.sid !== me) {
+    const body = JSON.stringify({ sid: me, url: 'https://script.google.com/d/' + me + '/edit', name: NAME, ver: VER, ts: now, at: jst_().at });
+    if (f) f.setContent(body);
+    else f = root.createFile(OWNER, body, 'application/json');
+    P.raw.setProperty('OWNERID', f.getId());
+  }
+  P.set('OWNCHK', now);
+  return true;
+}
+
+/** このプロジェクトの名前を「Alpha Lab 更新スクリプト」にする（古い「無題のプロジェクト」と見分けられるように） */
+function rename_() {
+  try {
+    const f = DriveApp.getFileById(ScriptApp.getScriptId());
+    if (f.getName() === NAME) return false;
+    f.setName(NAME);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * 第5版を初めて動かしたときに1回だけ: 第4版までのデータ（data フォルダ）を data5 に写し、古い状態ファイルを片付ける。
+ * 古い状態ファイルがなくなると、古いプロジェクトが動き続けていても、銘柄の一覧が読めずに何も取得しなくなる。
+ * 別のプロジェクトの第5版がすでに移していれば（data5 にデータがあれば）、写さずに受け継ぐ
+ */
+function init_(st, P) {
+  if (P.get('MIGRATED', null)) return null;
+  const t0 = Date.now(), res = { at: jst_().at, files: 0, ms: 0 };
+  rename_();
+  if (!Object.keys(st.files).length) migrate_(st, P, res);
+  res.ms = Date.now() - t0;
+  P.set('MIGRATED', res);
+  st.migrated = res;
+  Logger.log('第4版までのデータを移しました: ' + JSON.stringify(res));
+  return res;
+}
+
+function migrate_(st, P, res) {
+  const root = st._root;
+  // 古い状態ファイル（第4版までが覚えていたもの、なければ同じ名前のもののうち新しいもの）
+  const ofs = {};
+  const it = root.getFilesByName(OLD.status);
+  while (it.hasNext()) { const f = it.next(); if (!f.isTrashed()) ofs[f.getId()] = f; }
+  let of = byId_(P.raw.getProperty('STATUS'));
+  if (of && of.getName() !== OLD.status) of = null;
+  if (of) ofs[of.getId()] = of;
+  else of = Object.keys(ofs).map(k => ofs[k]).sort((a, b) => b.getLastUpdated().getTime() - a.getLastUpdated().getTime())[0] || null;
+  let os = null;
+  if (of) { try { os = JSON.parse(of.getBlob().getDataAsString('UTF-8')); } catch (e) { os = null; } }
+  if (!os || os.app !== 'alpha-lab') os = null;
+  // 古い data フォルダ: パスごとに、いちばん新しく書かれたファイルを写す（中身からハッシュを計算し直す）
+  let od = null;
+  [P.raw.getProperty('DATA'), os && os.dataId].forEach(id => {
+    if (od || !id) return;
+    try { const f = DriveApp.getFolderById(id); if (!f.isTrashed()) od = f; } catch (e) { /* 次を試す */ }
+  });
+  if (!od) od = first_(root.getFoldersByName(OLD.data));
+  if (od && od.getId() !== st._data.getId()) {
+    const best = {}, fi = od.getFiles();
+    while (fi.hasNext()) {
+      const f = fi.next(), m = f.getName().match(/^([a-z]+)-(.+)\.json\.gz\.b64$/);
+      if (!m || f.isTrashed()) continue;
+      const p = m[1] + '/' + m[2], t = f.getLastUpdated().getTime();
+      if (!best[p] || best[p].t < t) best[p] = { f: f, t: t };
+    }
+    const known = (os && os.files) || {}, paths = Object.keys(known).length ? Object.keys(known) : Object.keys(best);
+    paths.forEach(p => {
+      let f = best[p] ? best[p].f : null;
+      const e = known[p], g = byId_(e && e.id);
+      if (g && (!f || g.getLastUpdated().getTime() > best[p].t)) f = g;
+      if (!f) return;
+      try {
+        const b64 = f.getBlob().getDataAsString('UTF-8').trim(), json = unpack_(b64);
+        JSON.parse(json); // 壊れたものは写さない（次の更新で作り直す）
+        save_(st, p, b64, json, (e && e.at) || jst_(f.getLastUpdated().getTime()).at);
+        res.files++;
+      } catch (x) { /* 写せなかったものは次の更新で作り直す */ }
+    });
+    try { od.setName(OLD.data + '-old'); } catch (e) { /* 名前はそのままでよい */ }
+  }
+  if (os) ['jobs', 'log', 'alerts', 'mail', 'live', 'diag'].forEach(k => { if (os[k] != null) st[k] = os[k]; });
+  // 古い状態ファイルは名前を変えてゴミ箱へ（古いプロジェクトとページの古い版がこれを使わないように）
+  Object.keys(ofs).forEach(k => {
+    try { ofs[k].setName('alpha-lab-status-old.json'); ofs[k].setTrashed(true); } catch (e) { /* 残っても第5版には関係ない */ }
+  });
+  // 古い版のページが置いた依頼と設定（依頼は setup が全部の更新を始めるので捨てる。設定は今のものより新しければ使う）
+  const before = cfg_();
+  inbox_(DriveApp.searchFiles("(title contains '" + OLD.request + "' or title contains '" + OLD.config + "') and trashed = false"), OLD.request, OLD.config);
+  const after = cfg_();
+  if (before && after && (after.ts || 0) < (before.ts || 0)) props_().set('CFG', before);
+}
+
+/**
+ * 第4版までの古いプロジェクトがまだ動いているかを確かめる。古い版だけが拾う依頼ファイル（中身は何もしない「ping」）を置き、
+ * 1分半たっても残っていれば古い版は動いていない。消えていれば動いているので、10分後にもう一度確かめる。
+ * 結果は状態ファイルの old に書き、ページが「古いプロジェクトのトリガーを削除してください」と案内する
+ */
+function pingOld_(P, root) {
+  const now = Date.now(), pg = P.get('PING', null);
+  let o = P.get('OLD', null);
+  const set = alive => { o = { alive: alive, at: jst_().at, ts: now }; P.set('OLD', o); };
+  if (pg) {
+    if (now - pg.ts < 90000 || now - (pg.chk || 0) < (o && o.alive === false ? 10 * MIN : 0)) return o;
+    let gone = false;
+    try { gone = DriveApp.getFileById(pg.id).isTrashed(); } catch (e) { gone = true; }
+    if (gone) { set(true); P.set('PING', null); P.set('PINGNEXT', now + 10 * MIN); return o; }
+    pg.chk = now;
+    P.set('PING', pg);
+    if (now - pg.ts >= 4 * MIN && (!o || o.alive !== false)) set(false);
+  } else if (now >= P.get('PINGNEXT', 0)) {
+    try {
+      const f = root.createFile(OLD.request + '.json', JSON.stringify({ mode: 'ping', at: jst_().at, ts: now,
+        note: 'Alpha Lab 更新スクリプト第5版が、古い版が動いていないかを確かめるために置いたファイルです（消しても問題ありません）' }), 'application/json');
+      P.set('PING', { id: f.getId(), ts: now });
+    } catch (e) { P.set('PINGNEXT', now + 10 * MIN); }
+  }
+  return o;
+}
 
 // ========== 共通 ==========
 
@@ -1009,14 +1216,25 @@ const FACT = [['バリュー', [['ps', -1, true, true], ['pe', -1, true], ['peg'
   ['成長', [['rg', 1], ['eg', 1]]], ['モメンタム', [['ytd', 1], ['trend', 1], ['range', 1]]], ['予想修正', [['r30', 1], ['r90', 1], ['rud', 1], ['sur', 1]]]];
 const PF_N = 20;
 
-/** ページが置いた銘柄とセクターの一覧（スコアのセクター内比較に使う） */
-function universe_() {
-  const it = DriveApp.searchFiles("title contains 'alpha-lab-universe' and trashed = false"), fs = [];
-  while (it.hasNext()) fs.push(it.next());
-  if (!fs.length) return null;
+/**
+ * ページが置いた銘柄とセクターの一覧（スコアのセクター内比較に使う）。第5版の名前のものがまだなければ、第4版までの名前のものを使う。
+ * どちらを使ったかを状態ファイルの uni に書く（ページは第5版の名前で置き直す）
+ */
+function universe_(st) {
+  const list = (it, prefix) => { const a = []; while (it.hasNext()) { const f = it.next(); if (f.getName().indexOf(prefix) === 0) a.push(f); } return a; };
+  let src = 'v5', fs = list(st._root.searchFiles("title contains '" + UNIVERSE + "' and trashed = false"), UNIVERSE);
+  if (!fs.length) { src = 'old'; fs = list(DriveApp.searchFiles("title contains '" + OLD.universe + "' and trashed = false"), OLD.universe); }
+  if (!fs.length) { st.uni = null; return null; }
   fs.sort((x, y) => y.getDateCreated().getTime() - x.getDateCreated().getTime());
-  fs.slice(1).forEach(f => { try { f.setTrashed(true); } catch (e) { /* 次回 */ } });
-  try { const u = JSON.parse(fs[0].getBlob().getDataAsString('UTF-8')); return u && u.sec ? u.sec : null; } catch (e) { return null; }
+  if (src === 'v5') fs.slice(1).forEach(f => { try { f.setTrashed(true); } catch (e) { /* 次回 */ } });
+  try {
+    const u = JSON.parse(fs[0].getBlob().getDataAsString('UTF-8'));
+    if (!u || !u.sec) return null;
+    st.uni = { n: Object.keys(u.sec).length, ts: u.ts || 0, src: src };
+    return u.sec;
+  } catch (e) {
+    return null;
+  }
 }
 
 /** 銘柄ごとの [Alpha Score, バリュー, クオリティ, 成長, モメンタム, 予想修正]（0〜100） */
@@ -1077,7 +1295,7 @@ function scores_(q, f, a, e, sec) {
 function post_(st, mode) {
   const q = get_(st, 'meta/quotes');
   if (!q || !q.rows) return;
-  const a = get_(st, 'meta/analyst'), sc = scores_(q, get_(st, 'meta/fund'), a, get_(st, 'meta/earn'), universe_());
+  const a = get_(st, 'meta/analyst'), sc = scores_(q, get_(st, 'meta/fund'), a, get_(st, 'meta/earn'), universe_(st));
   const day = q.asOf || et_();
   history_(st, sc, q, a, day);
   portfolio_(st, sc, q, day, mode);

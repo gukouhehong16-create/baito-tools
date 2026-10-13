@@ -20,6 +20,9 @@ jobs:
         run: |
           mkdir -p out
           if git fetch --depth=1 origin alpha-lab-data; then git archive FETCH_HEAD | tar -x -C out; fi
+          # 銘柄一覧はブランチでは quotes-v2.json の名前で持つ（第4版までの Apps Script が初回用に読む quotes.json を置かないため。
+          # 残った古いプロジェクトは銘柄の一覧が読めずに何も取得しなくなり、第5版の取得とぶつからない）
+          if [ -f out/quotes-v2.json ]; then mv out/quotes-v2.json out/quotes.json; fi
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -32,6 +35,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cd out
+          if [ -f quotes.json ]; then mv quotes.json quotes-v2.json; fi
           git init -q -b alpha-lab-data
           git config user.name "alpha-lab-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
